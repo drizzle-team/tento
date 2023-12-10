@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {},
   "dependencies": {
-    "@drizzle-team/shopify": "link:../dist"
+    "@drizzle-team/tento": "link:../dist"
   },
   "private": true,
   "devDependencies": {

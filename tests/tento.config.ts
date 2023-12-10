@@ -1,8 +1,8 @@
-import { defineConfig } from '@drizzle-team/shopify/cli';
+import { defineConfig } from '@drizzle-team/tento/cli';
 
 export default defineConfig({
 	schemaPath: 'src/schema.ts',
-	shop: 'd91122',
+	shop: process.env['SHOP_ID']!,
 	headers: {
 		'X-Shopify-Access-Token': process.env['SHOPIFY_ADMIN_API_TOKEN']!,
 	},

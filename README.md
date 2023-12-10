@@ -52,10 +52,10 @@ export const designers = metaobject({
 
 ### Tento queries client
 ```ts
-import { shopify } from '@drizzle-team/tento';
+import { client } from '@drizzle-team/tento';
 import * as schema from './schema'
 
-const tento = shopify({
+const tento = client({
   shop: 'd91122', // your store id https://admin.shopify.com/store/d91122 <-
   headers: {
     'X-Shopify-Access-Token': process.env['SHOPIFY_ADMIN_API_TOKEN']!,
@@ -81,7 +81,7 @@ const designers = await tento.designers.list({
 ### Schema Migrations | Pull
 Now let's pull your existing Shopify Metaobjects schema, first we need to create a `tento.config.ts` file:
 ```ts
-import { defineConfig } from '@drizzle-team/shopify/cli';
+import { defineConfig } from '@drizzle-team/tento/cli';
 
 export default defineConfig({
 	schemaPath: './src/schema.ts',
@@ -101,7 +101,7 @@ bun tento pull
 
 Tento CLI will consume `tento.config.ts` and fetch your Shopify Metaobjects schema to your project `schema.ts` file:
 ```ts
-import { metaobject } from '@drizzle-team/shopify';
+import { metaobject } from '@drizzle-team/tento';
 
 export const orm = metaobject({
   name: 'ORM',

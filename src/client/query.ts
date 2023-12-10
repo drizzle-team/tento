@@ -411,7 +411,7 @@ export interface ShopifyConfig<TSchema extends Record<string, unknown>> {
 	schema: TSchema;
 }
 
-export function shopify<TSchema extends Record<string, unknown>>(
+export function client<TSchema extends Record<string, unknown>>(
 	config: ShopifyConfig<TSchema>,
 ): Shopify<ExtractSchema<TSchema>> {
 	const client = createGQLClient(fetch, config.shop, config.headers);

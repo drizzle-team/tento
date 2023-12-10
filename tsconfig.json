@@ -106,7 +106,7 @@
 		// "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
 		"skipLibCheck": true /* Skip type checking all .d.ts files. */,
 		"paths": {
-			"@drizzle-team/shopify": ["./src/client/index.ts"]
+			"@drizzle-team/tento": ["./src/client/index.ts"]
 		}
 	}
 }

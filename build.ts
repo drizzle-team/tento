@@ -15,7 +15,7 @@ await Promise.all([
 		format: ['cjs', 'esm'],
 		splitting: false,
 		treeshake: true,
-		external: ['@drizzle-team/shopify'],
+		external: ['@drizzle-team/tento'],
 	}),
 	esbuild.build({
 		entryPoints: ['src/cli/cli.ts'],
@@ -25,7 +25,7 @@ await Promise.all([
 		platform: 'node',
 		target: 'node18',
 		minify: true,
-		external: ['@drizzle-team/shopify'],
+		external: ['@drizzle-team/tento'],
 		banner: {
 			js: '#!/usr/bin/env -S node --loader=tsx --no-warnings',
 		},

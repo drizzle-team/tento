@@ -1,4 +1,4 @@
-import { metaobject } from '@drizzle-team/shopify';
+import { metaobject } from '@drizzle-team/tento';
 
 export const orm = metaobject({
 	name: 'ORM',
@@ -10,7 +10,7 @@ export const orm = metaobject({
 			validations: (v) => [v.min(1), v.max(50)],
 		}),
 		git_hub_repo: f.url({
-			name: 'GitHub repo',
+			name: 'GitHub Repo',
 			required: true,
 			validations: (v) => [v.allowedDomains(["github.com"])],
 		}),

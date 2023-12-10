@@ -4,9 +4,17 @@ import chalk from 'chalk';
 import prompt from 'prompt';
 import { literal, object, optional, safeParse, string, tuple, union, type Output, boolean } from 'valibot';
 import arg from 'arg';
+import semver from 'semver';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as utils from 'node:util';
+
+export const assertNodeVersion = () => {
+	if (semver.gte(process.version, '18.0.0')) return;
+
+	console.log(`${chalk.red.bold('err: ')}Tento requires NodeJS v18 or above`);
+	process.exit(1);
+};
 
 import type {
 	CreateMetaobjectDefinitionMutation,
@@ -18,7 +26,7 @@ import { diffSchemas, introspectRemoteSchema, readLocalSchema, type Config, type
 import { createGQLClient } from 'src/client/gql-client';
 
 const argsSchema = object({
-	'--config': optional(string(), 'shopify.config.ts'),
+	'--config': optional(string(), 'tento.config.ts'),
 	'--dry-run': optional(boolean()),
 	'--debug': optional(boolean()),
 	_: tuple([union([literal('pull'), literal('push')])]),
@@ -37,12 +45,12 @@ async function main() {
 	});
 	const argsParseResult = safeParse(argsSchema, rawArgv);
 	if (!argsParseResult.success) {
-		console.log('Usage: sp <command> [options]\n');
+		console.log('Usage: tento <command> [options]\n');
 		console.log('Commands:');
 		console.log('  pull\t synchronize the metaobject definitions from Shopify to the local schema');
 		console.log('  push [--dry-run]\t synchronize the metaobject definitions from the local schema to Shopify');
 		console.log('\nOptions:');
-		console.log('  --config <path>\t path to the config file (default: shopify.config.ts)');
+		console.log('  --config <path>\t path to the config file (default: tento.config.ts)');
 		console.log('  --debug');
 
 		if (rawArgv['--debug']) {
@@ -51,6 +59,8 @@ async function main() {
 
 		process.exit(1);
 	}
+
+	assertNodeVersion();
 
 	const args = argsParseResult.output;
 
@@ -292,7 +302,7 @@ async function pull(args: Args) {
 		process.exit(1);
 	}
 
-	const codegen: (string | undefined)[] = ["import { metaobject } from '@drizzle-team/shopify';\n"];
+	const codegen: (string | undefined)[] = ["import { metaobject } from '@drizzle-team/tento';\n"];
 	for (const definition of introspection) {
 		codegen.push(
 			`export const ${definition.type} = metaobject({`,

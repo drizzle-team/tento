@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { object, record, string, type Input } from 'valibot';
-import { Metaobject, type MetaobjectDefinition, type MetaobjectFieldDefinition } from '@drizzle-team/shopify';
+import { Metaobject, type MetaobjectDefinition, type MetaobjectFieldDefinition } from '@drizzle-team/tento';
 
 import { graphql } from 'src/graphql/gen';
 import type {
