@@ -3,18 +3,22 @@
 # Tento
 
 ### TypeScript SDK for Shopify Metaobjects API
+
 Tento [店頭] means Shop 🛍️ in Japanese  
 [Discord](https://driz.link/discord) | [Website](https://drizzle.team) | [Twitter](https://twitter.com/drizzleorm) | [Docs](https://github.com/drizzle-team/tento)
 </div>
 
-
 ## Overview
+
 Tento provides you a simple yet powerfull API for declaring Shopify Metaobjects typescript schema and querying them from Shopify.  
 It has a CLI companion to pull schema from Shopify and push local changes back to it.
 
 ## Quick Start
-### Installation 
+
+### Installation
+
 You can install Tento with your preferred package manager
+
 ```bash
 npm install tento
 yarn add tento
@@ -23,9 +27,11 @@ bun add tento
 ```
 
 ### Schema
+
 Declare your Tento metaobject schema in `schema.ts` file  
 !As of now Tento CLI only supports one schema file
-```ts 
+
+```ts
 import { metaobject } from '@drizzle-team/tento';
 
 export const designers = metaobject({
@@ -51,6 +57,7 @@ export const designers = metaobject({
 ```
 
 ### Tento queries client
+
 ```ts
 import { client } from '@drizzle-team/tento';
 import * as schema from './schema'
@@ -79,7 +86,9 @@ const designers = await tento.designers.list({
 ```
 
 ### Schema Migrations | Pull
+
 Now let's pull your existing Shopify Metaobjects schema, first we need to create a `tento.config.ts` file:
+
 ```ts
 import { defineConfig } from '@drizzle-team/tento/cli';
 
@@ -91,7 +100,9 @@ export default defineConfig({
   },
 });
 ```
+
 Now let's run Tento CLI `pull` command
+
 ```bash
 npx tento pull
 yarn tento pull
@@ -100,6 +111,7 @@ bun tento pull
 ```
 
 Tento CLI will consume `tento.config.ts` and fetch your Shopify Metaobjects schema to your project `schema.ts` file:
+
 ```ts
 import { metaobject } from '@drizzle-team/tento';
 
@@ -231,19 +243,24 @@ export const book = metaobject({
 ```
 
 ### Schema Migrations | Push
+
 Whenever you change your locall schema - you can apply changes to your Shopify by using `tento push` command:
+
 ```bash
 ~ npx tento push
 
 - Updated metaobject definition "ORM"
 ✅ All changes applied
 ```
+
 It will consume your `tento.config.ts` file, traverse your schema and apply any diffs to the remote
 
 ### Queries
+
 Tento supports all Shopify Metaobject API methods:
 
 `.list()`
+
 ```ts
 tento.designers.list({
   query: {
@@ -311,3 +328,13 @@ tento.designers.list({
   },
 });
 ```
+
+## Roadmap
+
+- [ ] Accept existing Shopify client instance
+- [ ] Support OAuth
+- [ ] Expose CLI operations as API
+- [ ] Support all field types and validations
+- [ ] Assign metaobjects to resources and metafields
+- [ ] Allow providing custom `fetch` implementation
+- [ ] Support multiple schema files
