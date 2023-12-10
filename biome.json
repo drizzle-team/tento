@@ -1,0 +1,38 @@
+{
+	"$schema": "https://biomejs.dev/schemas/1.4.0/schema.json",
+	"organizeImports": {
+		"enabled": true
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "off"
+			},
+			"nursery": {
+				"useGroupedTypeImport": "error"
+			},
+			"complexity": {
+				"useLiteralKeys": "off"
+			},
+			"style": {
+				"noNonNullAssertion": "off",
+				"useTemplate": "off",
+				"noParameterAssign": "off"
+			},
+			"performance": {
+				"noDelete": "off"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"lineWidth": 120
+		}
+	},
+	"files": {
+		"include": ["src", "*.ts", "!src/graphql/gen"]
+	}
+}
