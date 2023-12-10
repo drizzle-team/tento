@@ -27,7 +27,7 @@ await Promise.all([
 		minify: true,
 		external: ['@drizzle-team/shopify'],
 		banner: {
-			js: '#!/usr/bin/env -S node --import=tsx',
+			js: '#!/usr/bin/env -S node --loader=tsx --no-warnings',
 		},
 		plugins: [
 			replace({
