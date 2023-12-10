@@ -64,7 +64,7 @@ const tento = client({
 });
 
 const designers = await tento.designers.list({
-	first: 10,
+  first: 10,
 });
 /* 
   {
@@ -84,11 +84,11 @@ Now let's pull your existing Shopify Metaobjects schema, first we need to create
 import { defineConfig } from '@drizzle-team/tento/cli';
 
 export default defineConfig({
-	schemaPath: './src/schema.ts',
-	shop: 'd91122',
-	headers: {
-		'X-Shopify-Access-Token': process.env['SHOPIFY_ADMIN_API_TOKEN']!,
-	},
+  schemaPath: './src/schema.ts',
+  shop: 'd91122',
+  headers: {
+    'X-Shopify-Access-Token': process.env['SHOPIFY_ADMIN_API_TOKEN']!,
+  },
 });
 ```
 Now let's run Tento CLI `pull` command
