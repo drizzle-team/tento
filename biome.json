@@ -33,6 +33,7 @@
 		}
 	},
 	"files": {
-		"include": ["src", "*.ts", "!src/graphql/gen"]
+		"include": ["src", "*.ts"],
+		"ignore": ["src/graphql/gen"]
 	}
 }

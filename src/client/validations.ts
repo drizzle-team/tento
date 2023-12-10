@@ -1,4 +1,4 @@
-import type { MetafieldDefinitionValidationInput } from './types.js';
+import type { MetafieldDefinitionValidationInput } from './types';
 
 export type Validations = Record<string, (...args: any[]) => MetafieldDefinitionValidationInput>;
 

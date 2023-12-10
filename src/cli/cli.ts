@@ -1,12 +1,12 @@
-#!/usr/bin/env node --import tsx
 import 'dotenv/config';
 
 import chalk from 'chalk';
 import prompt from 'prompt';
 import { literal, object, optional, safeParse, string, tuple, union, type Output } from 'valibot';
-import minimist from 'minimist';
+import arg from 'arg';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import * as utils from 'node:util';
 
 import type {
 	CreateMetaobjectDefinitionMutation,
@@ -14,13 +14,21 @@ import type {
 	CreateMetaobjectDefinitionMutationVariables,
 	UpdateMetaobjectDefinitionMutation,
 	DeleteMetaobjectDefinitionMutationVariables,
-} from 'src/graphql/gen/types/admin.generated.js';
-import type { MutationMetaobjectDefinitionUpdateArgs } from 'src/graphql/gen/types/admin.types.js';
-import { createGQLClient, diffSchemas, introspectRemoteSchema, readLocalSchema, type Config } from './index.js';
-import type { MetaobjectFieldDefinition } from '@drizzle-team/shopify';
+} from 'src/graphql/gen/types/admin.generated';
+import type { MutationMetaobjectDefinitionUpdateArgs } from 'src/graphql/gen/types/admin.types';
+import {
+	createGQLClient,
+	diffSchemas,
+	introspectRemoteSchema,
+	readLocalSchema,
+	type Config,
+	type Introspection,
+} from './index';
 
 const argsSchema = object({
-	config: optional(string(), 'shopify.config.ts'),
+	'--config': optional(string(), 'shopify.config.ts'),
+	'--dry-run': optional(literal('true')),
+	'--debug': optional(literal('true')),
 	_: tuple([union([literal('pull'), literal('push')])]),
 });
 
@@ -30,15 +38,23 @@ async function main() {
 	prompt.message = '';
 	prompt.start();
 
-	const rawArgv = minimist(process.argv.slice(2));
+	const rawArgv = arg({
+		'--config': String,
+		'--dry-run': Boolean,
+		'--debug': Boolean,
+	});
 	const argsParseResult = safeParse(argsSchema, rawArgv);
 	if (!argsParseResult.success) {
 		console.log('Usage: sp <command> [options]\n');
 		console.log('Commands:');
 		console.log('  pull\t synchronize the metaobject definitions from Shopify to the local schema');
-		console.log('  push\t synchronize the metaobject definitions from the local schema to Shopify');
+		console.log('  push [--dry-run]\t synchronize the metaobject definitions from the local schema to Shopify');
 		console.log('\nOptions:');
 		console.log('  --config <path>\t path to the config file (default: shopify.config.ts)');
+
+		if (rawArgv['--debug']) {
+			console.log(utils.inspect(argsParseResult.issues, { colors: true, depth: null }));
+		}
 
 		process.exit(1);
 	}
@@ -58,7 +74,7 @@ async function main() {
 }
 
 async function readConfig(args: Args): Promise<Config> {
-	const configPath = path.resolve(args.config);
+	const configPath = path.resolve(args['--config']);
 	const configStat = await fs.stat(configPath).catch(() => undefined);
 	if (!configStat) {
 		console.log(chalk.red.bold(`ERROR: "${configPath}" does not exist`));
@@ -81,7 +97,7 @@ async function push(args: Args) {
 		...config.headers,
 	});
 
-	const schemaPath = path.resolve(path.dirname(args.config), config.schemaPath);
+	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 
 	const [schema, introspection] = await Promise.all([readLocalSchema(schemaPath), introspectRemoteSchema(gql)]);
 	const diff = diffSchemas(schema, introspection);
@@ -89,6 +105,12 @@ async function push(args: Args) {
 	if (!diff.create.length && !diff.update.length && !diff.delete.length) {
 		console.log(chalk.gray('✅ Schema is already up to date, no changes required'));
 		return;
+	}
+
+	if (args['--dry-run']) {
+		console.log(chalk.yellow.bold('⚠️ This is a dry run, no changes will be applied'));
+		console.log(chalk.yellow('The following changes will be applied:'));
+		console.log(utils.inspect(diff, { colors: true, depth: null }));
 	}
 
 	let shouldConfirm = false;
@@ -246,7 +268,7 @@ async function push(args: Args) {
 async function pull(args: Args) {
 	const config = await readConfig(args);
 
-	const schemaPath = path.resolve(path.dirname(args.config), config.schemaPath);
+	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 	const schemaStat = await fs.stat(schemaPath).catch(() => undefined);
 	if (schemaStat) {
 		if (!schemaStat.isFile()) {
@@ -288,7 +310,7 @@ async function pull(args: Args) {
 			`export const ${definition.type} = metaobject({`,
 			`\tname: '${definition.name}',`,
 			`\ttype: '${definition.type}',`,
-			definition.description !== undefined
+			typeof definition.description === 'string'
 				? `\tdescription: '${definition.description.replace("'", "\\'")}',`
 				: undefined,
 			'\tfieldDefinitions: (f) => ({',
@@ -334,7 +356,7 @@ function mapFieldName(field: string) {
 	return result;
 }
 
-function mapFieldDefinition(field: MetaobjectFieldDefinition) {
+function mapFieldDefinition(field: Introspection[number]['fieldDefinitions'][number]) {
 	const result: Record<string, string> = {};
 	if (field.name !== field.key) {
 		result['name'] = `'${field.name!.replace("'", "\\'")}'`;
@@ -343,8 +365,15 @@ function mapFieldDefinition(field: MetaobjectFieldDefinition) {
 		result['required'] = 'true';
 	}
 
-	if (field.description !== undefined && field.description !== '') {
+	if (typeof field.description === 'string' && field.description !== '') {
 		result['description'] = `'${field.description.replace("'", "\\'")}'`;
+	}
+
+	if (field.validations.length) {
+		const validations = mapValidations(field.type, field.validations);
+		if (validations) {
+			result['validations'] = validations;
+		}
 	}
 
 	if (!Object.keys(result).length) {
@@ -353,7 +382,89 @@ function mapFieldDefinition(field: MetaobjectFieldDefinition) {
 	return ['{', ...Object.entries(result).map(([key, value]) => `\t\t\t${key}: ${value},`), '\t\t}'].join('\n');
 }
 
-function mapValidations(validations: )
+function mapValidations(
+	fieldType: string,
+	validations: Introspection[number]['fieldDefinitions'][number]['validations'],
+) {
+	if (!validations.length) {
+		return undefined;
+	}
+
+	const result: string[] = [];
+
+	for (const validation of validations) {
+		switch (validation.name) {
+			case 'min':
+			case 'max': {
+				let value;
+				if (['dimension', 'volume', 'weight'].some((t) => fieldType === t || fieldType === `list.${t}`)) {
+					value = jsonStringify(JSON.parse(validation.value!));
+				} else if (
+					['single_line_text_field', 'multi_line_text_field', 'number_integer', 'number_decimal'].some(
+						(t) => fieldType === t || fieldType === `list.${t}`,
+					)
+				) {
+					value = validation.value!;
+				} else {
+					value = `'${validation.value!.replace("'", "\\'")}'`;
+				}
+				result.push(`v.${validation.name}(${value})`);
+				break;
+			}
+			case 'max_precision': {
+				result.push(`v.maxPrecision(${validation.value})`);
+				break;
+			}
+			case 'regex': {
+				result.push(`v.regex(/${validation.value!.replace('/', '\\/')}/)`);
+				break;
+			}
+			case 'allowed_domains': {
+				result.push(`v.allowedDomains(${jsonStringify(JSON.parse(validation.value!))})`);
+				break;
+			}
+			case 'file_type_options': {
+				const value: Record<string, true> = {};
+				for (const type of JSON.parse(validation.value!)) {
+					switch (type) {
+						case 'Image': {
+							value['images'] = true;
+							break;
+						}
+						case 'Video': {
+							value['videos'] = true;
+							break;
+						}
+					}
+				}
+				result.push(`v.fileTypes(${jsonStringify(value)})`);
+				break;
+			}
+			case 'choices': {
+				result.push(`v.choices(${jsonStringify(JSON.parse(validation.value!))})`);
+				break;
+			}
+			default: {
+				result.push(jsonStringify(validation));
+			}
+		}
+	}
+
+	if (result.length > 2) {
+		return `(v) => [${result.map((s) => `\n\t\t\t\t${s},`).join('')}\n\t\t\t]`;
+	}
+	return `(v) => [${result.join(', ')}]`;
+}
+
+function jsonStringify(obj: any) {
+	if (Array.isArray(obj)) {
+		return `[${obj.map((v) => JSON.stringify(v)).join(', ')}]`;
+	}
+
+	return `{ ${Object.keys(obj)
+		.map((k) => `${k}: ${JSON.stringify(obj[k])}`)
+		.join(', ')} }`;
+}
 
 main()
 	.catch((err) => {

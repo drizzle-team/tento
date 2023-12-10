@@ -1,6 +1,6 @@
 import type { GraphQLClient } from '@shopify/graphql-client';
 
-import { Metaobject } from './metaobject.js';
+import { Metaobject } from './metaobject';
 import type {
 	ExtractSchema,
 	IteratorConfig,
@@ -12,21 +12,21 @@ import type {
 	ListResult,
 	ResultItem,
 	UpdateConfig,
-} from './types.js';
-import { Field, dateTime, singleLineTextField } from './field.js';
+} from './types';
+import { Field, dateTime, singleLineTextField } from './field';
 import type {
 	BulkDeleteMetaobjectsMutation,
 	BulkDeleteMetaobjectsMutationVariables,
 	DeleteMetaobjectMutation,
 	UpdateMetaobjectMutation,
 	UpdateMetaobjectMutationVariables,
-} from 'src/graphql/gen/types/admin.generated.js';
+} from 'src/graphql/gen/types/admin.generated';
 import type {
 	InputMaybe,
 	MetaobjectCapabilityDataInput,
 	MetaobjectUpdateInput,
 	MetaobjectUserError,
-} from 'src/graphql/gen/types/admin.types.js';
+} from 'src/graphql/gen/types/admin.types';
 
 export class ShopifyBase<TSchema extends Record<string, Metaobject<any>>> {
 	readonly _: {

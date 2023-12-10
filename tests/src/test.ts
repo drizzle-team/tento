@@ -3,7 +3,7 @@ import { createGraphQLClient } from '@shopify/graphql-client';
 import { parseEnv, z } from 'znv';
 
 import { shopify } from '@drizzle-team/shopify';
-import * as schema from './test_schema.js';
+import * as schema from './test_schema';
 
 dotenv.config({ path: '../../.env' });
 

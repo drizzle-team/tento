@@ -1,5 +1,5 @@
-import type { Field, Fields } from './field.js';
-import type { Metaobject } from './metaobject.js';
+import type { Field, Fields } from './field';
+import type { Metaobject } from './metaobject';
 
 export type InferBaseModel<T extends MetaobjectDefinitionConfig> = ReturnType<
 	T['fieldDefinitions']

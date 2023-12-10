@@ -1,4 +1,4 @@
-import { Field, fields } from './field.js';
+import { Field, fields } from './field';
 import type {
 	MetaobjectDefinitionConfig,
 	InferSelectModel,
@@ -6,7 +6,7 @@ import type {
 	InferBaseModel,
 	MetaobjectDefinition,
 	MetaobjectFieldDefinition,
-} from './types.js';
+} from './types';
 
 const isMetaobjectSym = Symbol.for('drizzle-shopify:isMetaobject');
 

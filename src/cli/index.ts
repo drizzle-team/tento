@@ -2,13 +2,13 @@ import path from 'node:path';
 import { object, record, string, type Input } from 'valibot';
 
 import { Metaobject, type MetaobjectDefinition, type MetaobjectFieldDefinition } from '@drizzle-team/shopify';
-import type { IntrospectionQuery } from 'src/graphql/gen/types/admin.generated.js';
+import type { IntrospectionQuery } from 'src/graphql/gen/types/admin.generated';
 import type {
 	MetaobjectDefinitionUpdateInput,
 	MetaobjectFieldDefinitionUpdateInput,
 	MutationMetaobjectDefinitionCreateArgs,
 	MutationMetaobjectDefinitionUpdateArgs,
-} from 'src/graphql/gen/types/admin.types.js';
+} from 'src/graphql/gen/types/admin.types';
 
 export async function readLocalSchema(schemaPath: string) {
 	const importResult = require(path.resolve(schemaPath));
@@ -63,10 +63,12 @@ export async function introspectRemoteSchema(client: GQLClient) {
 				nodes {
 					id
 					name
+					description
 					type
 					fieldDefinitions {
 						name
 						required
+						description
 						validations {
 							name
 							value
@@ -95,14 +97,16 @@ export async function introspectRemoteSchema(client: GQLClient) {
 				};
 			}),
 		};
-	}) as (MetaobjectDefinition & { id: string })[];
+	});
 
 	return introspectedMetaobjectsList;
 }
 
+export type Introspection = ReturnType<typeof introspectRemoteSchema> extends Promise<infer T> ? T : never;
+
 export function diffSchemas(
 	local: Record<string, MetaobjectDefinition>,
-	remote: (MetaobjectDefinition & { id: string })[],
+	remote: Introspection,
 ): {
 	create: MutationMetaobjectDefinitionCreateArgs[];
 	update: MutationMetaobjectDefinitionUpdateArgs[];
@@ -143,7 +147,7 @@ export function diffSchemas(
 
 export function diffMetaobjectDefinitions(
 	local: MetaobjectDefinition,
-	remote: MetaobjectDefinition & { id: string },
+	remote: Introspection[number],
 ): MetaobjectDefinitionUpdateInput | undefined {
 	const localFields = Object.values(local.fieldDefinitions);
 	const remoteFields = Object.values(remote.fieldDefinitions);
@@ -159,7 +163,7 @@ export function diffMetaobjectDefinitions(
 		if (!remoteField) {
 			result.fieldDefinitions!.push({ create: localField });
 		} else {
-			const diff = diffFields(localField, remoteField);
+			const diff = diffFields(localField, remoteField as MetaobjectFieldDefinition);
 			if (diff) {
 				result.fieldDefinitions!.push({ update: diff });
 			}

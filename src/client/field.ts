@@ -1,12 +1,12 @@
 import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc.js';
+import utc from 'dayjs/plugin/utc';
 
 import type {
 	MetaobjectFieldDefinitionBuilder,
 	MetaobjectFieldDefinitionConfig,
 	MetaobjectFieldDefinitionConfigWithType,
-} from './types.js';
-import { allowedDomains, choices, fileTypes, max, maxPrecision, min, regex, type Validations } from './validations.js';
+} from './types';
+import { allowedDomains, choices, fileTypes, max, maxPrecision, min, regex, type Validations } from './validations';
 
 dayjs.extend(utc);
 

@@ -25,6 +25,10 @@ await Promise.all([
 		platform: 'node',
 		target: 'node18',
 		minify: true,
+		external: ['@drizzle-team/shopify'],
+		banner: {
+			js: '#!/usr/bin/env node --import tsx',
+		},
 	}),
 ]);
 
