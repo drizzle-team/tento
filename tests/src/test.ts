@@ -1,25 +1,15 @@
-import dotenv from 'dotenv';
-import { createGraphQLClient } from '@shopify/graphql-client';
-import { parseEnv, z } from 'znv';
+import 'dotenv/config';
 
 import { shopify } from '@drizzle-team/shopify';
-import * as schema from './test_schema';
 
-dotenv.config({ path: '../../.env' });
+import * as schema from './schema';
+import config from '../shopify.config';
 
-const env = parseEnv(process.env, {
-	SHOPIFY_ADMIN_API_TOKEN: z.string(),
+const sp = shopify({
+	shop: config.shop,
+	headers: config.headers,
+	schema,
 });
-
-const client = createGraphQLClient({
-	url: 'https://d91122.myshopify.com/admin/api/2023-10/graphql.json',
-	headers: {
-		'Content-Type': 'application/json',
-		'X-Shopify-Access-Token': env.SHOPIFY_ADMIN_API_TOKEN,
-	},
-});
-
-const sp = shopify(client, { schema });
 
 // {
 // 	sp.orms.list({
@@ -126,18 +116,15 @@ const sp = shopify(client, { schema });
 
 // await sp.orms.delete('gid://shopify/Metaobject/35528147247');
 
-const items = await sp.orms.list({
-	query: {
-		$raw: 'display_name:drizzle',
-	},
+const items = await sp.orm.list({
 	first: 10,
 });
 
 console.log(items);
 
-export type ORM = typeof sp.orms.$inferSelect;
+export type ORM = typeof sp.orm.$inferSelect;
 //           ^?
-export type InsertORM = typeof sp.orms.$inferInsert;
+export type InsertORM = typeof sp.orm.$inferInsert;
 //           ^?
-export type UpdateORM = typeof sp.orms.$inferUpdate;
+export type UpdateORM = typeof sp.orm.$inferUpdate;
 //           ^?

@@ -1,13 +1,38 @@
-import { ApiType, shopifyApiProject } from '@shopify/api-codegen-preset';
+import type { CodegenConfig } from '@graphql-codegen/cli';
 
-export default {
-	schema: 'https://shopify.dev/storefront-graphql-direct-proxy',
+const config: CodegenConfig = {
+	schema: 'https://shopify.dev/admin-graphql-direct-proxy',
 	documents: ['src/cli/**/*.ts', 'src/client/**/*.ts'],
-	projects: {
-		default: shopifyApiProject({
-			apiType: ApiType.Admin,
-			apiVersion: '2023-10',
-			outputDir: 'src/graphql/gen/types',
-		}),
+	generates: {
+		// 'src/graphql/gen/types.ts': {
+		// 	plugins: ['typescript', 'typescript-operations'],
+		// 	config: {
+		// 		avoidOptionals: {
+		// 			field: true,
+		// 			inputValue: false,
+		// 			object: true,
+		// 			defaultValue: true,
+		// 		},
+		// 		useTypeImports: true,
+		// 		skipTypename: true,
+		// 		preResolveTypes: false,
+		// 	},
+		// },
+		'src/graphql/gen/': {
+			preset: 'client',
+			config: {
+				avoidOptionals: {
+					field: true,
+					inputValue: false,
+					object: true,
+					defaultValue: true,
+				},
+				useTypeImports: true,
+				skipTypename: true,
+				documentMode: 'string',
+			},
+		},
 	},
 };
+
+export default config;

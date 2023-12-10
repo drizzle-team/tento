@@ -1,14 +1,15 @@
 import path from 'node:path';
 import { object, record, string, type Input } from 'valibot';
-
 import { Metaobject, type MetaobjectDefinition, type MetaobjectFieldDefinition } from '@drizzle-team/shopify';
-import type { IntrospectionQuery } from 'src/graphql/gen/types/admin.generated';
+
+import { graphql } from 'src/graphql/gen';
 import type {
 	MetaobjectDefinitionUpdateInput,
 	MetaobjectFieldDefinitionUpdateInput,
 	MutationMetaobjectDefinitionCreateArgs,
 	MutationMetaobjectDefinitionUpdateArgs,
-} from 'src/graphql/gen/types/admin.types';
+} from 'src/graphql/gen/graphql';
+import type { GQLClient } from 'src/client/gql-client';
 
 export async function readLocalSchema(schemaPath: string) {
 	const importResult = await import(path.resolve(schemaPath));
@@ -23,41 +24,8 @@ export async function readLocalSchema(schemaPath: string) {
 	return schema;
 }
 
-export type Fetch = typeof fetch;
-
-export interface ResponseErrors {
-	networkStatusCode?: number;
-	message?: string;
-	graphQLErrors?: any[];
-}
-
-export interface ClientResponse<TData> {
-	data?: TData;
-	errors?: ResponseErrors;
-}
-
-export interface GQLClient {
-	<TResult = unknown, TVars = Record<string, unknown>>(query: string, vars?: TVars): Promise<ClientResponse<TResult>>;
-}
-
-export function createGQLClient(fetch: Fetch, url: string, headers: Record<string, string>) {
-	const client: GQLClient = async (query, vars) => {
-		const response = await fetch(url, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify({ query, variables: vars }),
-		});
-		const result = await response.json();
-		if (result.errors) {
-			throw new Error(result.errors[0].message);
-		}
-		return result;
-	};
-	return client;
-}
-
 export async function introspectRemoteSchema(client: GQLClient) {
-	const introspectionQuery = `#graphql
+	const introspectionQuery = graphql(`
 		query Introspection {
 			metaobjectDefinitions(first: 100) {
 				nodes {
@@ -81,9 +49,9 @@ export async function introspectRemoteSchema(client: GQLClient) {
 				}
 			}
 		}
-	`;
+	`);
 
-	const introspectionResult = await client<IntrospectionQuery>(introspectionQuery);
+	const introspectionResult = await client(introspectionQuery);
 	if (introspectionResult.errors?.graphQLErrors?.length) {
 		throw new Error(introspectionResult.errors.graphQLErrors[0].message);
 	}
@@ -163,7 +131,7 @@ export function diffMetaobjectDefinitions(
 		if (!remoteField) {
 			result.fieldDefinitions!.push({ create: localField });
 		} else {
-			const diff = diffFields(localField, remoteField as MetaobjectFieldDefinition);
+			const diff = diffFields(localField, remoteField);
 			if (diff) {
 				result.fieldDefinitions!.push({ update: diff });
 			}
@@ -190,12 +158,11 @@ export function diffMetaobjectDefinitions(
 
 export function diffFields(
 	localField: MetaobjectFieldDefinition,
-	remoteField: MetaobjectFieldDefinition,
+	remoteField: Introspection[number]['fieldDefinitions'][number],
 ): MetaobjectFieldDefinitionUpdateInput | undefined {
 	const updates: Omit<MetaobjectFieldDefinitionUpdateInput, 'key'> = {};
-	const localDescription = localField.description ?? '';
-	if (localDescription !== remoteField.description) {
-		updates.description = localDescription;
+	if ((localField.description ?? '') !== (remoteField.description ?? '')) {
+		updates.description = localField.description ?? '';
 	}
 	const localName = localField.name ?? localField.key;
 	if (localName !== remoteField.name) {

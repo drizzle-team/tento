@@ -1,5 +1,3 @@
-import type { GraphQLClient } from '@shopify/graphql-client';
-
 import { Metaobject } from './metaobject';
 import type {
 	ExtractSchema,
@@ -14,27 +12,23 @@ import type {
 	UpdateConfig,
 } from './types';
 import { Field, dateTime, singleLineTextField } from './field';
-import type {
-	BulkDeleteMetaobjectsMutation,
-	BulkDeleteMetaobjectsMutationVariables,
-	DeleteMetaobjectMutation,
-	UpdateMetaobjectMutation,
-	UpdateMetaobjectMutationVariables,
-} from 'src/graphql/gen/types/admin.generated';
+
 import type {
 	InputMaybe,
 	MetaobjectCapabilityDataInput,
 	MetaobjectUpdateInput,
 	MetaobjectUserError,
-} from 'src/graphql/gen/types/admin.types';
+} from 'src/graphql/gen/graphql';
+import { graphql } from 'src/graphql/gen';
+import { createGQLClient, type GQLClient } from './gql-client';
 
 export class ShopifyBase<TSchema extends Record<string, Metaobject<any>>> {
 	readonly _: {
-		readonly client: GraphQLClient;
+		readonly client: GQLClient;
 		readonly schema: TSchema;
 	};
 
-	constructor(client: GraphQLClient, schema: TSchema) {
+	constructor(client: GQLClient, schema: TSchema) {
 		this._ = { client, schema };
 	}
 }
@@ -56,7 +50,7 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	declare readonly $inferInsert: T['$inferInsert'];
 	declare readonly $inferUpdate: T['$inferUpdate'];
 
-	constructor(metaobject: T, private client: GraphQLClient) {
+	constructor(metaobject: T, private client: GQLClient) {
 		this._ = { metaobject };
 	}
 
@@ -146,18 +140,16 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 			}
 		`;
 
-		const response = await this.client.request<any>(query, {
-			variables: {
-				type: this._.metaobject._.config.type,
-				query: buildListQuery(config.query),
-				after: config.after,
-				before: config.before,
-				first: config.first,
-				last: config.last,
-				reverse: config.reverse,
-				sortKey: config.sortKey,
-				...Object.fromEntries(selectedFields.map((f, i) => [`field${i}`, this._.metaobject.fieldKeysMap[f]])),
-			},
+		const response = await this.client(query, {
+			type: this._.metaobject._.config.type,
+			query: buildListQuery(config.query),
+			after: config.after,
+			before: config.before,
+			first: config.first,
+			last: config.last,
+			reverse: config.reverse,
+			sortKey: config.sortKey,
+			...Object.fromEntries(selectedFields.map((f, i) => [`field${i}`, this._.metaobject.fieldKeysMap[f]])),
 		});
 
 		if (response.errors) {
@@ -189,12 +181,10 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 				}
 			}`;
 
-		const variables = {
+		const response = await this.client(query, {
 			id,
 			...Object.fromEntries(selectedFields.map((f, i) => [`field${i}`, this._.metaobject.fieldKeysMap[f]])),
-		};
-
-		const response = await this.client.request<any>(query, { variables });
+		});
 
 		if (response.errors) {
 			throw new Error(response.errors.graphQLErrors?.map((e) => e.message).join('\n'));
@@ -235,7 +225,7 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 						}
 					}`;
 
-			const variables = {
+			const response = await this.client(query, {
 				type: this._.metaobject._.config.type,
 				query: buildListQuery(config.query),
 				after: cursor,
@@ -243,9 +233,7 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 				reverse: config.reverse,
 				sortKey: config.sortKey,
 				...Object.fromEntries(selectedFields.map((f, i) => [`field${i}`, this._.metaobject.fieldKeysMap[f]])),
-			};
-
-			const response = await this.client.request<any>(query, { variables });
+			});
 
 			if (response.errors) {
 				throw new Error(response.errors.graphQLErrors?.map((e) => e.message).join('\n'));
@@ -265,14 +253,14 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 			throw new Error('At least one update must be specified');
 		}
 
-		const query = `#graphql
+		const query = graphql(`
 			mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
 				metaobjectUpdate(id: $id, metaobject: $metaobject) {
 					userErrors {
 						field, message
 					}
 				}
-			}`;
+			}`);
 
 		const metaobjectUpdateInput: MetaobjectUpdateInput = {};
 
@@ -301,12 +289,10 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 			});
 		}
 
-		const variables: UpdateMetaobjectMutationVariables = {
+		const response = await this.client(query, {
 			id,
 			metaobject: metaobjectUpdateInput,
-		};
-
-		const response = await this.client.request<UpdateMetaobjectMutation>(query, { variables });
+		});
 
 		if (response.errors) {
 			throw new Error(response.errors.graphQLErrors?.map((e) => e.message).join('\n'));
@@ -330,22 +316,20 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 				}
 			}`;
 
-		const result = await this.client.request<any>(query, {
-			variables: {
-				metaobject: {
-					type: this._.metaobject._.config.type,
-					fields: Object.entries(item).map(([key, value]) => {
-						const field = this._.metaobject.fields[key];
-						if (!field) {
-							throw new Error(`Unknown field "${key}"`);
-						}
+		const result = await this.client(query, {
+			metaobject: {
+				type: this._.metaobject._.config.type,
+				fields: Object.entries(item).map(([key, value]) => {
+					const field = this._.metaobject.fields[key];
+					if (!field) {
+						throw new Error(`Unknown field "${key}"`);
+					}
 
-						return {
-							key: this._.metaobject.fieldKeysMap[key],
-							value: field.toAPIValue(value),
-						};
-					}),
-				},
+					return {
+						key: this._.metaobject.fieldKeysMap[key],
+						value: field.toAPIValue(value),
+					};
+				}),
 			},
 		});
 
@@ -369,20 +353,16 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	}
 
 	async delete(id: string) {
-		const query = `#graphql
+		const query = graphql(`
 			mutation DeleteMetaobject($id: ID!) {
 				metaobjectDelete(id: $id) {
 					userErrors {
 						field, message
 					}
 				}
-			}`;
+			}`);
 
-		const result = await this.client.request<DeleteMetaobjectMutation>(query, {
-			variables: {
-				id,
-			},
-		});
+		const result = await this.client(query, { id });
 
 		if (result.errors) {
 			throw new Error(result.errors.graphQLErrors?.map((e) => e.message).join('\n'));
@@ -394,21 +374,19 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	}
 
 	async bulkDelete(ids: string[]) {
-		const query = `#graphql
+		const query = graphql(`
 			mutation BulkDeleteMetaobjects($ids: [ID!]!, $type: String!) {
 				metaobjectBulkDelete(where: { ids: $ids, type: $type }) {
 					userErrors {
 						field, message
 					}
 				}
-			}`;
+			}`);
 
-		const variables: BulkDeleteMetaobjectsMutationVariables = {
+		const result = await this.client(query, {
 			ids,
 			type: this._.metaobject._.config.type,
-		};
-
-		const result = await this.client.request<BulkDeleteMetaobjectsMutation>(query, { variables });
+		});
 
 		if (result.errors) {
 			throw new Error(result.errors.graphQLErrors?.map((e) => e.message).join('\n'));
@@ -428,13 +406,16 @@ export type Shopify<TSchema extends Record<string, Metaobject<any>>> = ShopifyBa
 	ShopifyOperationsMap<TSchema>;
 
 export interface ShopifyConfig<TSchema extends Record<string, unknown>> {
+	shop: string;
+	headers: Record<string, string>;
 	schema: TSchema;
 }
 
 export function shopify<TSchema extends Record<string, unknown>>(
-	client: GraphQLClient,
 	config: ShopifyConfig<TSchema>,
 ): Shopify<ExtractSchema<TSchema>> {
+	const client = createGQLClient(fetch, config.shop, config.headers);
+
 	return Object.assign(
 		new ShopifyBase(client, config.schema as ExtractSchema<TSchema>),
 		Object.fromEntries(

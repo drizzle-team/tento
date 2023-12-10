@@ -1,9 +1,14 @@
 {
   "name": "tests",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "scripts": {},
+  "dependencies": {
+    "@drizzle-team/shopify": "link:../dist"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3"
+  }
 }

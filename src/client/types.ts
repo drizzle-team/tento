@@ -1,3 +1,8 @@
+import type {
+	MetaobjectAdminAccess,
+	MetaobjectCapabilityCreateInput,
+	MetaobjectStorefrontAccess,
+} from 'src/graphql/gen/graphql';
 import type { Field, Fields } from './field';
 import type { Metaobject } from './metaobject';
 
@@ -135,76 +140,6 @@ export type MetaobjectAccessInput = {
 	 *
 	 */
 	storefront?: MetaobjectStorefrontAccess;
-};
-
-/** Defines how the metaobjects of a definition can be accessed in admin API surface areas. */
-export enum MetaobjectAdminAccess {
-	/**
-	 * Applications that act on behalf of merchants can read metaobjects.
-	 * Only the owning application can write metaobjects.
-	 *
-	 */
-	MerchantRead = 'MERCHANT_READ',
-	/**
-	 * The owning application, as well as applications that act on behalf of merchants can read and write metaobjects.
-	 * No other applications can read or write metaobjects.
-	 *
-	 */
-	MerchantReadWrite = 'MERCHANT_READ_WRITE',
-	/**
-	 * Only the application that owns a metaobject can read and write to it.
-	 *
-	 */
-	Private = 'PRIVATE',
-	/**
-	 * All applications with the `metaobjects` access scope can read metaobjects.
-	 * Only the owning application can write metaobjects.
-	 *
-	 */
-	PublicRead = 'PUBLIC_READ',
-	/**
-	 * All applications with the `metaobjects` access scope can read and write metaobjects.
-	 *
-	 */
-	PublicReadWrite = 'PUBLIC_READ_WRITE',
-}
-
-/**
- * Defines how the metaobjects of a definition can be accessed in Storefront API surface areas, including Liquid and the GraphQL Storefront API.
- *
- */
-export enum MetaobjectStorefrontAccess {
-	/**
-	 * Metaobjects are not accessible in any Storefront API surface area.
-	 *
-	 */
-	None = 'NONE',
-	/**
-	 * Metaobjects are accessible in the GraphQL Storefront API by any application with the `unauthenticated_read_metaobjects` access scope.
-	 * Metaobjects are accessible in online store Liquid templates.
-	 *
-	 */
-	PublicRead = 'PUBLIC_READ',
-}
-
-/** The input fields for creating a metaobject capability. */
-export type MetaobjectCapabilityCreateInput = {
-	/** The input for enabling the publishable capability. */
-	publishable?: MetaobjectCapabilityPublishableInput;
-	/** The input for enabling the translatable capability. */
-	translatable?: MetaobjectCapabilityTranslatableInput;
-};
-
-/** The input fields for enabling and disabling the publishable capability. */
-export type MetaobjectCapabilityPublishableInput = {
-	/** Indicates whether the capability should be enabled or disabled. */
-	enabled: boolean;
-};
-
-/** The input fields for enabling and disabling the translatable capability. */
-export type MetaobjectCapabilityTranslatableInput = {
-	/** Indicates whether the capability should be enabled or disabled. */
-	enabled: boolean;
 };
 
 export type ExtractSchema<TSchema extends Record<string, unknown>> = Simplify<{

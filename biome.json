@@ -8,7 +8,8 @@
 		"rules": {
 			"recommended": true,
 			"suspicious": {
-				"noExplicitAny": "off"
+				"noExplicitAny": "off",
+				"noRedeclare": "off"
 			},
 			"nursery": {
 				"useGroupedTypeImport": "error"

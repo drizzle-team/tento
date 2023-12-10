@@ -12,18 +12,10 @@ import type {
 	CreateMetaobjectDefinitionMutation,
 	DeleteMetaobjectDefinitionMutation,
 	CreateMetaobjectDefinitionMutationVariables,
-	UpdateMetaobjectDefinitionMutation,
 	DeleteMetaobjectDefinitionMutationVariables,
-} from 'src/graphql/gen/types/admin.generated';
-import type { MutationMetaobjectDefinitionUpdateArgs } from 'src/graphql/gen/types/admin.types';
-import {
-	createGQLClient,
-	diffSchemas,
-	introspectRemoteSchema,
-	readLocalSchema,
-	type Config,
-	type Introspection,
-} from './index';
+} from 'src/graphql/gen/graphql';
+import { diffSchemas, introspectRemoteSchema, readLocalSchema, type Config, type Introspection } from './index';
+import { createGQLClient } from 'src/client/gql-client';
 
 const argsSchema = object({
 	'--config': optional(string(), 'shopify.config.ts'),
@@ -93,18 +85,15 @@ async function readConfig(args: Args): Promise<Config> {
 async function push(args: Args) {
 	const config = await readConfig(args);
 
-	const gql = createGQLClient(fetch, `https://${config.shop}.myshopify.com/admin/api/2023-10/graphql.json`, {
-		'Content-Type': 'application/json',
-		...config.headers,
-	});
+	const client = createGQLClient(fetch, config.shop, config.headers);
 
 	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 
-	const [schema, introspection] = await Promise.all([readLocalSchema(schemaPath), introspectRemoteSchema(gql)]);
+	const [schema, introspection] = await Promise.all([readLocalSchema(schemaPath), introspectRemoteSchema(client)]);
 	const diff = diffSchemas(schema, introspection);
 
 	if (!diff.create.length && !diff.update.length && !diff.delete.length) {
-		console.log(chalk.gray('✅ Schema is already up to date, no changes required'));
+		console.log(chalk.gray('😴 Schema is already up to date, no changes required'));
 		return;
 	}
 
@@ -167,7 +156,7 @@ async function push(args: Args) {
 		console.log();
 	}
 
-	const createQuery = `#graphql
+	const createQuery = /* GraphQL */ `
 		mutation CreateMetaobjectDefinition($definition: MetaobjectDefinitionCreateInput!) {
 			metaobjectDefinitionCreate(definition: $definition) {
 				metaobjectDefinition {
@@ -181,7 +170,7 @@ async function push(args: Args) {
 	`;
 
 	for (const create of diff.create) {
-		const result = await gql<CreateMetaobjectDefinitionMutation, CreateMetaobjectDefinitionMutationVariables>(
+		const result = await client<CreateMetaobjectDefinitionMutation, CreateMetaobjectDefinitionMutationVariables>(
 			createQuery,
 			{ definition: create.definition },
 		);
@@ -200,7 +189,7 @@ async function push(args: Args) {
 		);
 	}
 
-	const updateQuery = `#graphql
+	const updateQuery = /* GraphQL */ `
 		mutation UpdateMetaobjectDefinition($id: ID!, $definition: MetaobjectDefinitionUpdateInput!) {
 			metaobjectDefinitionUpdate(id: $id, definition: $definition) {
 				metaobjectDefinition {
@@ -214,7 +203,7 @@ async function push(args: Args) {
 	`;
 
 	for (const update of diff.update) {
-		const result = await gql<UpdateMetaobjectDefinitionMutation, MutationMetaobjectDefinitionUpdateArgs>(updateQuery, {
+		const result = await client(updateQuery, {
 			id: update.id,
 			definition: update.definition,
 		});
@@ -238,7 +227,7 @@ async function push(args: Args) {
 		);
 	}
 
-	const deleteQuery = `#graphql
+	const deleteQuery = /* GraphQL */ `
 		mutation DeleteMetaobjectDefinition($id: ID!) {
 			metaobjectDefinitionDelete(id: $id) {
 				userErrors {
@@ -248,7 +237,7 @@ async function push(args: Args) {
 		}`;
 
 	for (const id of diff.delete) {
-		const result = await gql<DeleteMetaobjectDefinitionMutation, DeleteMetaobjectDefinitionMutationVariables>(
+		const result = await client<DeleteMetaobjectDefinitionMutation, DeleteMetaobjectDefinitionMutationVariables>(
 			deleteQuery,
 			{ id },
 		);
@@ -293,10 +282,7 @@ async function pull(args: Args) {
 		}
 	}
 
-	const gql = createGQLClient(fetch, `https://${config.shop}.myshopify.com/admin/api/2023-10/graphql.json`, {
-		'Content-Type': 'application/json',
-		...config.headers,
-	});
+	const gql = createGQLClient(fetch, config.shop, config.headers);
 
 	const introspection = await introspectRemoteSchema(gql);
 
