@@ -1,6 +1,7 @@
 import { build } from 'tsup';
 import * as esbuild from 'esbuild';
 import fs from 'fs/promises';
+import { replace } from 'esbuild-plugin-replace';
 
 await Promise.all([
 	build({
@@ -15,7 +16,6 @@ await Promise.all([
 		splitting: false,
 		treeshake: true,
 		external: ['@drizzle-team/shopify'],
-		tsconfig: 'src/tsconfig.json',
 	}),
 	esbuild.build({
 		entryPoints: ['src/cli/cli.ts'],
@@ -27,8 +27,13 @@ await Promise.all([
 		minify: true,
 		external: ['@drizzle-team/shopify'],
 		banner: {
-			js: '#!/usr/bin/env node --import tsx',
+			js: '#!/usr/bin/env -S node --import=tsx',
 		},
+		plugins: [
+			replace({
+				'await import': 'require',
+			}),
+		],
 	}),
 ]);
 

@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import chalk from 'chalk';
 import prompt from 'prompt';
-import { literal, object, optional, safeParse, string, tuple, union, type Output } from 'valibot';
+import { literal, object, optional, safeParse, string, tuple, union, type Output, boolean } from 'valibot';
 import arg from 'arg';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -27,8 +27,8 @@ import {
 
 const argsSchema = object({
 	'--config': optional(string(), 'shopify.config.ts'),
-	'--dry-run': optional(literal('true')),
-	'--debug': optional(literal('true')),
+	'--dry-run': optional(boolean()),
+	'--debug': optional(boolean()),
 	_: tuple([union([literal('pull'), literal('push')])]),
 });
 
@@ -51,6 +51,7 @@ async function main() {
 		console.log('  push [--dry-run]\t synchronize the metaobject definitions from the local schema to Shopify');
 		console.log('\nOptions:');
 		console.log('  --config <path>\t path to the config file (default: shopify.config.ts)');
+		console.log('  --debug');
 
 		if (rawArgv['--debug']) {
 			console.log(utils.inspect(argsParseResult.issues, { colors: true, depth: null }));
@@ -86,7 +87,7 @@ async function readConfig(args: Args): Promise<Config> {
 		process.exit(1);
 	}
 
-	return require(configPath).default;
+	return (await import(configPath)).default;
 }
 
 async function push(args: Args) {
@@ -109,8 +110,9 @@ async function push(args: Args) {
 
 	if (args['--dry-run']) {
 		console.log(chalk.yellow.bold('⚠️ This is a dry run, no changes will be applied'));
-		console.log(chalk.yellow('The following changes will be applied:'));
+		console.log(chalk.yellow('The following changes were detected:'));
 		console.log(utils.inspect(diff, { colors: true, depth: null }));
+		return;
 	}
 
 	let shouldConfirm = false;

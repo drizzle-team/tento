@@ -11,7 +11,7 @@ import type {
 } from 'src/graphql/gen/types/admin.types';
 
 export async function readLocalSchema(schemaPath: string) {
-	const importResult = require(path.resolve(schemaPath));
+	const importResult = await import(path.resolve(schemaPath));
 	const schema: Record<string, MetaobjectDefinition> = {};
 	for (const key in importResult) {
 		const value = importResult[key];
