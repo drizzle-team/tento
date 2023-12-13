@@ -2,9 +2,11 @@
   
 # Tento
 
-### TypeScript SDK for Shopify Metaobjects API
 
-Tento [店頭] means Shop 🛍️ in Japanese  
+
+### Shopify Metaobjects made easy for NodeJS and TypeScritp
+<h6>Tento [店頭] means Shop 🛍️ in Japanese</h6>
+
 [Discord](https://driz.link/discord) | [Website](https://drizzle.team) | [Twitter](https://twitter.com/drizzleorm) | [Docs](https://github.com/drizzle-team/tento)
 </div>
 
