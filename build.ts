@@ -15,7 +15,8 @@ await Promise.all([
 		format: ['cjs', 'esm'],
 		splitting: false,
 		treeshake: true,
-		external: ['@drizzle-team/tento'],
+		external: ['@drizzle-team/tento', /^@shopify\//],
+		tsconfig: 'src/tsconfig.json',
 	}),
 	esbuild.build({
 		entryPoints: ['src/cli/cli.ts'],

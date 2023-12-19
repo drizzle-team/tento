@@ -1,13 +1,15 @@
 import 'dotenv/config';
 
-import { client } from '@drizzle-team/tento';
+import { createClient, tento } from '@drizzle-team/tento';
 
 import * as schema from './schema';
 import config from '../tento.config';
 
-const sp = client({
-	shop: config.shop,
-	headers: config.headers,
+const sp = tento({
+	client: createClient({
+		shop: config.shop,
+		headers: config.headers,
+	}),
 	schema,
 });
 

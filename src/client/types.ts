@@ -2,7 +2,7 @@ import type {
 	MetaobjectAdminAccess,
 	MetaobjectCapabilityCreateInput,
 	MetaobjectStorefrontAccess,
-} from 'src/graphql/gen/graphql';
+} from '../graphql/gen/graphql';
 import type { Field, Fields } from './field';
 import type { Metaobject } from './metaobject';
 

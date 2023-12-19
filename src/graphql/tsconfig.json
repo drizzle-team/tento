@@ -1,6 +1,7 @@
 {
 	"extends": "../../tsconfig.json",
 	"compilerOptions": {
-		"verbatimModuleSyntax": false
+		"verbatimModuleSyntax": false,
+		"noPropertyAccessFromIndexSignature": false
 	}
 }

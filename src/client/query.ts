@@ -18,18 +18,31 @@ import type {
 	MetaobjectCapabilityDataInput,
 	MetaobjectUpdateInput,
 	MetaobjectUserError,
-} from 'src/graphql/gen/graphql';
-import { graphql } from 'src/graphql/gen';
-import { createGQLClient, type GQLClient } from './gql-client';
+} from '../graphql/gen/graphql';
+import { graphql } from '../graphql/gen';
+import { type Client, ClientSource, createClientFromSource } from './gql-client';
+import { applySchema } from './apply-schema';
 
-export class ShopifyBase<TSchema extends Record<string, Metaobject<any>>> {
+export class Tento<TSchema extends Record<string, Metaobject<any>>> {
 	readonly _: {
-		readonly client: GQLClient;
+		readonly client: Client;
 		readonly schema: TSchema;
 	};
 
-	constructor(client: GQLClient, schema: TSchema) {
+	metaobjects: TentoMetaobjectOperationsMap<TSchema>;
+
+	constructor(client: Client, schema: TSchema) {
 		this._ = { client, schema };
+		this.metaobjects = Object.fromEntries(
+			Object.entries(schema).map(([key, metaobject]) => [key, new ShopifyMetaobjectOperations(metaobject, client)]),
+		) as TentoMetaobjectOperationsMap<TSchema>;
+	}
+
+	async applySchema() {
+		await applySchema({
+			localSchema: this._.schema,
+			client: this._.client,
+		});
 	}
 }
 
@@ -41,7 +54,7 @@ const metaFields: Record<string, Field<any>> = {
 
 const metaFieldNames = Object.keys(metaFields);
 
-export class ShopifyOperations<T extends Metaobject<any>> {
+export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 	readonly _: {
 		readonly metaobject: T;
 	};
@@ -50,7 +63,7 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	declare readonly $inferInsert: T['$inferInsert'];
 	declare readonly $inferUpdate: T['$inferUpdate'];
 
-	constructor(metaobject: T, private client: GQLClient) {
+	constructor(metaobject: T, private client: Client) {
 		this._ = { metaobject };
 	}
 
@@ -198,8 +211,9 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	}
 
 	async *iterator<TConfig extends IteratorConfig<T>>(
-		config: KnownKeysOnly<TConfig, IteratorConfig<T>>,
+		config?: KnownKeysOnly<TConfig, IteratorConfig<T>>,
 	): AsyncGenerator<ResultItem<T, TConfig['fields']>, void, unknown> {
+		config ??= {} as KnownKeysOnly<TConfig, IteratorConfig<T>>;
 		const allSelectedFieldsMap = this.getSelectedFields(config.fields);
 		const allSelectedFields = Object.keys(allSelectedFieldsMap);
 		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
@@ -398,32 +412,24 @@ export class ShopifyOperations<T extends Metaobject<any>> {
 	}
 }
 
-export type ShopifyOperationsMap<TSchema extends Record<string, Metaobject<any>>> = {
-	[K in keyof TSchema]: ShopifyOperations<TSchema[K]>;
+export type TentoMetaobjectOperationsMap<TSchema extends Record<string, Metaobject<any>>> = {
+	[K in keyof TSchema]: ShopifyMetaobjectOperations<TSchema[K]>;
 };
 
-export type Shopify<TSchema extends Record<string, Metaobject<any>>> = ShopifyBase<TSchema> &
-	ShopifyOperationsMap<TSchema>;
-
-export interface ShopifyConfig<TSchema extends Record<string, unknown>> {
-	shop: string;
-	headers: Record<string, string>;
+export interface TentoConfig<TSchema extends Record<string, unknown>> {
+	client: ClientSource;
 	schema: TSchema;
 }
 
-export function client<TSchema extends Record<string, unknown>>(
-	config: ShopifyConfig<TSchema>,
-): Shopify<ExtractSchema<TSchema>> {
-	const client = createGQLClient(fetch, config.shop, config.headers);
-
-	return Object.assign(
-		new ShopifyBase(client, config.schema as ExtractSchema<TSchema>),
-		Object.fromEntries(
-			Object.entries(config.schema)
-				.filter(([, v]) => v instanceof Metaobject)
-				.map(([key, metaobject]) => [key, new ShopifyOperations(metaobject as Metaobject<any>, client)]),
-		),
-	) as Shopify<ExtractSchema<TSchema>>;
+export function tento<TSchema extends Record<string, unknown>>(
+	config: TentoConfig<TSchema>,
+): Tento<ExtractSchema<TSchema>> {
+	const { client: clientSource, schema: rawSchema } = config;
+	const client = createClientFromSource(clientSource);
+	const schema = Object.fromEntries(
+		Object.entries(rawSchema).filter((e): e is [(typeof e)[0], Metaobject<any>] => e[1] instanceof Metaobject),
+	) as ExtractSchema<TSchema>;
+	return new Tento(client, schema);
 }
 
 export function buildListQueryItem(query: ListConfigQueryItem<string | number | boolean | Date>): string {

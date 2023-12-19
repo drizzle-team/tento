@@ -3,3 +3,4 @@ export * from './metaobject';
 export * from './types';
 export * from './validations';
 export * from './query';
+export * from './gql-client';

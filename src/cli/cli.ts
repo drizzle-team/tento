@@ -21,9 +21,10 @@ import type {
 	DeleteMetaobjectDefinitionMutation,
 	CreateMetaobjectDefinitionMutationVariables,
 	DeleteMetaobjectDefinitionMutationVariables,
-} from 'src/graphql/gen/graphql';
-import { diffSchemas, introspectRemoteSchema, readLocalSchema, type Config, type Introspection } from './index';
-import { createGQLClient } from 'src/client/gql-client';
+} from '../graphql/gen/graphql';
+import { readLocalSchema, type Config } from './index';
+import { createClient } from '../client/gql-client';
+import { Introspection, diffSchemas, introspectRemoteSchema } from '../client/diff';
 
 const argsSchema = object({
 	'--config': optional(string(), 'tento.config.ts'),
@@ -95,7 +96,7 @@ async function readConfig(args: Args): Promise<Config> {
 async function push(args: Args) {
 	const config = await readConfig(args);
 
-	const client = createGQLClient(fetch, config.shop, config.headers);
+	const client = createClient({ shop: config.shop, headers: config.headers });
 
 	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 
@@ -230,11 +231,7 @@ async function push(args: Args) {
 		if (metaobject.name !== name) {
 			name = `"${metaobject.name}" -> ${name}`;
 		}
-		console.log(
-			chalk.gray(
-				`- Updated metaobject definition "${result.data!.metaobjectDefinitionUpdate!.metaobjectDefinition!.name}"`,
-			),
-		);
+		console.log(chalk.gray(`- Updated metaobject definition "${name}"`));
 	}
 
 	const deleteQuery = /* GraphQL */ `
@@ -292,7 +289,7 @@ async function pull(args: Args) {
 		}
 	}
 
-	const gql = createGQLClient(fetch, config.shop, config.headers);
+	const gql = createClient({ shop: config.shop, headers: config.headers });
 
 	const introspection = await introspectRemoteSchema(gql);
 

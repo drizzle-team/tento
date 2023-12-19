@@ -34,7 +34,7 @@
 		}
 	},
 	"files": {
-		"include": ["src", "*.ts"],
-		"ignore": ["src/graphql/gen"]
+		"include": ["src", "type-tests", "*.ts"],
+		"ignore": ["src/graphql/gen", "dist"]
 	}
 }

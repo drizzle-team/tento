@@ -8,7 +8,7 @@ import type {
 	MetaobjectFieldDefinition,
 } from './types';
 
-const isMetaobjectSym = Symbol.for('drizzle-shopify:isMetaobject');
+const isMetaobjectSym = Symbol.for('tento:isMetaobject');
 
 export class Metaobject<TBaseModel extends Record<string, any>> {
 	// @ts-expect-error - this symbol is used in the instanceof check below

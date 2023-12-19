@@ -1,37 +1,36 @@
 <div align="center">
-  
+
 # Tento
 
+### Shopify data framework for NodeJS and TypeScript
 
-
-### Shopify Metaobjects made easy for NodeJS and TypeScritp
-<h6>Tento [店頭] means Shop 🛍️ in Japanese</h6>
+<h6>Tento [店頭] means "shop" 🛍️ in Japanese</h6>
 
 [Discord](https://driz.link/discord) | [Website](https://drizzle.team) | [Twitter](https://twitter.com/drizzleorm) | [Docs](https://github.com/drizzle-team/tento)
 </div>
 
 ## Overview
 
-Tento provides you a simple yet powerfull API for declaring Shopify Metaobjects typescript schema and querying them from Shopify.  
-It has a CLI companion to pull schema from Shopify and push local changes back to it.
+Tento provides a simple yet powerful API for working with Shopify data, including metaobjects and metafields.
+It also provides a CLI tool for two-way synchronization between your local schema definition and Shopify.
 
 ## Quick Start
 
 ### Installation
 
-You can install Tento with your preferred package manager
+You can install Tento with your preferred package manager:
 
 ```bash
-npm install tento
-yarn add tento
-pnpm add tento
-bun add tento
+npm install @drizzle-team/tento
+yarn add @drizzle-team/tento
+pnpm add @drizzle-team/tento
+bun add @drizzle-team/tento
 ```
 
 ### Schema
 
-Declare your Tento metaobject schema in `schema.ts` file  
-!As of now Tento CLI only supports one schema file
+Declare your Tento metaobjects schema in `schema.ts` file.
+As of now Tento CLI only supports one schema file:
 
 ```ts
 import { metaobject } from '@drizzle-team/tento';
@@ -61,18 +60,40 @@ export const designers = metaobject({
 ### Tento queries client
 
 ```ts
-import { client } from '@drizzle-team/tento';
-import * as schema from './schema'
+import { tento } from '@drizzle-team/tento';
+import * as schema from './schema';
 
-const tento = client({
-  shop: 'd91122', // your store id https://admin.shopify.com/store/d91122 <-
+// Using @shopify/shopify-api (or its wrappers)
+import '@shopify/shopify-api/adapters/node';
+import { shopifyApi, ApiVersion } from '@shopify/shopify-api';
+const shopifyClient = shopifyApi({ ... });
+const gqlClient = new shopifyApiClient.clients.Graphql({
+  session: ...,
+});
+
+// Using raw fetch
+import { createClient } from '@drizzle-team/tento';
+const gqlClient = createClient({
+  shop: 'your-shop-name',
   headers: {
-    'X-Shopify-Access-Token': process.env['SHOPIFY_ADMIN_API_TOKEN']!,
+    // any headers you need
+    // Content-Type is added automatically unless you override it
+    'X-Shopify-Access-Token': 'your-admin-api-access-token',
   },
+  fetch: customFetch, // optionally provide your own fetch implementation
+});
+
+// Create Tento client from any Shopify client above
+const client = tento({
+  client: gqlClient,
   schema,
 });
 
-const designers = await tento.designers.list({
+// Apply the local schema to Shopify
+await client.applySchema();
+
+// Query metaobjects
+const designers = await tento.metaobjects.designers.list({
   first: 10,
 });
 /* 
@@ -112,7 +133,7 @@ pnpm tento pull
 bun tento pull
 ```
 
-Tento CLI will consume `tento.config.ts` and fetch your Shopify Metaobjects schema to your project `schema.ts` file:
+Tento CLI will consume `tento.config.ts` and fetch your Shopify schema to your project `schema.ts` file:
 
 ```ts
 import { metaobject } from '@drizzle-team/tento';
@@ -255,7 +276,7 @@ Whenever you change your locall schema - you can apply changes to your Shopify b
 ✅ All changes applied
 ```
 
-It will consume your `tento.config.ts` file, traverse your schema and apply any diffs to the remote
+It will consume your `tento.config.ts` file, traverse your schema and apply any diffs to Shopify.
 
 ### Queries
 
@@ -264,17 +285,17 @@ Tento supports all Shopify Metaobject API methods:
 `.list()`
 
 ```ts
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     $raw: 'state:disabled AND ("sale shopper" OR VIP)',
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: ['Bob', 'Norman'],
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     displayName: {
       $raw: 'Bob Norman',
@@ -282,14 +303,14 @@ tento.designers.list({
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     displayName: 'Bob Norman',
     updatedAt: new Date('2023-01-01'),
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     updatedAt: {
       $gte: new Date('2023-01-01'),
@@ -298,7 +319,7 @@ tento.designers.list({
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     displayName: {
       $not: 'bob',
@@ -306,25 +327,25 @@ tento.designers.list({
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: [{ $or: ['bob', 'norman'] }, 'Shopify'],
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: [{ displayName: 'Bob' }, { $or: ['sale shopper', 'VIP'] }],
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     displayName: 'Bob Norman',
   },
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: 'norm*',
 });
 
-tento.designers.list({
+tento.metaobjects.designers.list({
   query: {
     displayName: 'norm*',
   },
@@ -333,10 +354,12 @@ tento.designers.list({
 
 ## Roadmap
 
-- [ ] Accept existing Shopify client instance
-- [ ] Support OAuth
-- [ ] Expose CLI operations as API
+- [x] Accept existing Shopify client instance
+- [x] Support OAuth
+- [x] Expose CLI operations as API
+- [x] Allow providing custom `fetch` implementation
 - [ ] Support all field types and validations
+- [ ] Metafields management
 - [ ] Assign metaobjects to resources and metafields
-- [ ] Allow providing custom `fetch` implementation
+- [ ] Products management
 - [ ] Support multiple schema files
