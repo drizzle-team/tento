@@ -16,7 +16,8 @@
     "lint": "biome lint .",
     "gql": "graphql-codegen --config .graphqlrc.ts",
     "build": "tsx build.ts",
-    "b": "pnpm build"
+    "b": "pnpm build",
+    "postinstall": "tsx build.ts"
   },
   "keywords": [],
   "devDependencies": {
