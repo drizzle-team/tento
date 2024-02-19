@@ -96,7 +96,7 @@ await client.applySchema();
 const designers = await tento.metaobjects.designers.list({
   first: 10,
 });
-/* 
+/*
   {
     _id: string;
     _handle: string;
@@ -206,6 +206,7 @@ export const orm = metaobject({
     weight_list: f.weightList({
       validations: (v) => [v.min({ value: 1, unit: "KILOGRAMS" }), v.max({ value: 100, unit: "POUNDS" })],
     }),
+    json: f.json(),
   }),
 });
 

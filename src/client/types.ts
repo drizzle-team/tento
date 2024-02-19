@@ -134,12 +134,12 @@ export type MetaobjectAccessInput = {
 	 * Access configuration for Admin API surface areas, including the GraphQL Admin API.
 	 *
 	 */
-	admin?: MetaobjectAdminAccess;
+	admin?: `${MetaobjectAdminAccess}`;
 	/**
 	 * Access configuration for Storefront API surface areas, including the GraphQL Storefront API and Liquid.
 	 *
 	 */
-	storefront?: MetaobjectStorefrontAccess;
+	storefront?: `${MetaobjectStorefrontAccess}`;
 };
 
 export type ExtractSchema<TSchema extends Record<string, unknown>> = Simplify<{

@@ -66,6 +66,7 @@ export const fields = {
 	// fileList,
 	dimension,
 	dimensionList,
+	json,
 	volume,
 	volumeList,
 	weight,
@@ -73,6 +74,23 @@ export const fields = {
 };
 
 export type Fields = typeof fields;
+
+export class JsonField extends Field<string> {
+	constructor(config: MetaobjectFieldDefinitionConfig<JsonFieldValidations>, validations: Validations) {
+		super({ ...config, type: 'json' }, validations);
+	}
+}
+
+export function json<T extends MetaobjectFieldDefinitionConfig<JsonFieldValidations>>(
+	config?: T,
+): JsonField {
+	return new JsonField(config ?? {}, jsonFieldValidations);
+}
+
+export const jsonFieldValidations = {
+};
+
+export type JsonFieldValidations = typeof singleLineTextFieldValidations;
 
 export class SingleLineTextField extends Field<string> {
 	constructor(config: MetaobjectFieldDefinitionConfig<SingleLineTextFieldValidations>, validations: Validations) {

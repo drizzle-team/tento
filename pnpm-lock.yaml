@@ -20,7 +20,7 @@ importers:
         version: 1.4.1
       '@drizzle-team/tento':
         specifier: link:./dist
-        version: link:dist
+        version: link:node_modules/@drizzle-team/tento
       '@graphql-codegen/cli':
         specifier: ^5.0.0
         version: 5.0.0(@types/node@20.10.3)(graphql@16.8.1)(typescript@5.3.2)

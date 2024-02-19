@@ -3,6 +3,10 @@ import { metaobject } from '@drizzle-team/tento';
 export const orm = metaobject({
 	name: 'ORM',
 	type: 'orm',
+	access: {
+		admin: "PUBLIC_READ",
+		storefront: "PUBLIC_READ",
+	},
 	fieldDefinitions: (f) => ({
 		name: f.singleLineTextField({
 			name: 'Name',
@@ -68,6 +72,7 @@ export const orm = metaobject({
 		weight_list: f.weightList({
 			validations: (v) => [v.min({ value: 1, unit: "KILOGRAMS" }), v.max({ value: 100, unit: "POUNDS" })],
 		}),
+		json: f.json(),
 	}),
 });
 
