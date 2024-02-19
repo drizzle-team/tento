@@ -6,7 +6,8 @@
   "license": "MIT",
   "description": "",
   "module": "index.js",
-  "main": "index.cjs",
+  "main": "dist/index.cjs",
+  "files": ["dist"],
   "type": "module",
   "bin": {
     "tento": "./cli/cli.cjs"
