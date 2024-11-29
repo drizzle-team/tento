@@ -53,6 +53,7 @@ export function createClientFromSource(source: ClientSource): Client {
 	return Object.assign(client, { [isClientSym]: true as const });
 }
 
+// TODO() Provide API version for GQL !!!
 export function createClient({
 	shop,
 	headers = {},

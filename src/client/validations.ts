@@ -1,4 +1,4 @@
-import type { MetafieldDefinitionValidationInput } from './types';
+import { MetafieldDefinitionValidationInput } from './types';
 
 export type Validations = Record<string, (...args: any[]) => MetafieldDefinitionValidationInput>;
 
@@ -38,4 +38,8 @@ export function fileTypes(types: { images?: boolean; videos?: boolean }): Metafi
 
 export function choices(values: string[]): MetafieldDefinitionValidationInput {
 	return { name: 'choices', value: JSON.stringify(values) };
+}
+
+export function metaobjectDefinition(value: string): MetafieldDefinitionValidationInput {
+	return { name: 'metaobject_definition_id', value };
 }

@@ -1,9 +1,9 @@
 {
-	"extends": "../tsconfig.json",
-	"compilerOptions": {
-		"paths": {
-			"@drizzle-team/tento": ["./src/client/index.ts"],
-			"@drizzle-team/tento/*": ["./src/client/*"]
-		}
-	}
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@drizzle-team/tento": ["./src/client/index.ts"],
+      "@drizzle-team/tento/*": ["./src/client/*"]
+    }
+  }
 }

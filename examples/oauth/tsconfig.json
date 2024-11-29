@@ -1,10 +1,10 @@
 {
-	"compilerOptions": {
-		"strict": true,
-		"jsx": "react-jsx",
-		"jsxImportSource": "hono/jsx",
-		"target": "ESNext",
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
-	}
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  }
 }

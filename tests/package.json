@@ -2,9 +2,13 @@
   "name": "tests",
   "version": "1.0.0",
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
-    "@drizzle-team/tento": "link:../dist"
+    "@drizzle-team/tento": "link:../dist",
+    "@shopify/shopify-api": "11.5.0",
+    "vitest": "2.1.0"
   },
   "private": true,
   "devDependencies": {

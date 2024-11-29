@@ -3,14 +3,15 @@ import type {
 	MetaobjectDefinitionConfig,
 	InferSelectModel,
 	InferUpdateModel,
-	InferBaseModel,
 	MetaobjectDefinition,
 	MetaobjectFieldDefinition,
+	InferInsertModel,
+	InferBaseModel,
 } from './types';
 
 const isMetaobjectSym = Symbol.for('tento:isMetaobject');
 
-export class Metaobject<TBaseModel extends Record<string, any>> {
+export class Metaobject<TBaseModel extends MetaobjectDefinitionConfig> {
 	// @ts-expect-error - this symbol is used in the instanceof check below
 	private readonly [isMetaobjectSym] = true;
 
@@ -23,9 +24,10 @@ export class Metaobject<TBaseModel extends Record<string, any>> {
 	readonly _: {
 		readonly config: MetaobjectDefinition;
 	};
-	declare readonly $inferSelect: InferSelectModel<TBaseModel>;
-	declare readonly $inferInsert: TBaseModel;
-	declare readonly $inferUpdate: InferUpdateModel<TBaseModel>;
+	declare readonly $inferSelect: InferSelectModel<InferBaseModel<TBaseModel>>;
+	declare readonly $inferInsert: InferInsertModel<TBaseModel>;
+	declare readonly $inferUpdate: InferUpdateModel<InferBaseModel<TBaseModel>>;
+	declare readonly type: string;
 
 	constructor(config: MetaobjectDefinitionConfig) {
 		this.fields = config.fieldDefinitions(fields);
@@ -45,6 +47,8 @@ export class Metaobject<TBaseModel extends Record<string, any>> {
 				fieldDefinitions,
 			},
 		};
+
+		this.type = config.type;
 	}
 
 	static [Symbol.hasInstance](instance: unknown) {
@@ -57,6 +61,6 @@ export class Metaobject<TBaseModel extends Record<string, any>> {
 	}
 }
 
-export function metaobject<T extends MetaobjectDefinitionConfig>(config: T): Metaobject<InferBaseModel<T>> {
+export function metaobject<T extends MetaobjectDefinitionConfig>(config: T): Metaobject<T> {
 	return new Metaobject(config);
 }

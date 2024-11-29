@@ -1,54 +1,28 @@
-import { Metaobject } from './metaobject';
 import type {
-	ExtractSchema,
 	IteratorConfig,
-	KnownKeysOnly,
 	ListConfig,
 	ListConfigFields,
 	ListConfigQuery,
-	ListConfigQueryItem,
 	ListResult,
 	ResultItem,
 	UpdateConfig,
 } from './types';
 import { Field, dateTime, singleLineTextField } from './field';
-
+import { Metaobject } from './metaobject';
 import type {
 	InputMaybe,
 	MetaobjectCapabilityDataInput,
 	MetaobjectUpdateInput,
 	MetaobjectUserError,
-} from '../graphql/gen/graphql';
-import { graphql } from '../graphql/gen';
-import { type Client, ClientSource, createClientFromSource } from './gql-client';
-import { applySchema } from './apply-schema';
-
-export class Tento<TSchema extends Record<string, Metaobject<any>>> {
-	readonly _: {
-		readonly client: Client;
-		readonly schema: TSchema;
-	};
-
-	metaobjects: TentoMetaobjectOperationsMap<TSchema>;
-
-	constructor(client: Client, schema: TSchema) {
-		this._ = { client, schema };
-		this.metaobjects = Object.fromEntries(
-			Object.entries(schema).map(([key, metaobject]) => [key, new ShopifyMetaobjectOperations(metaobject, client)]),
-		) as TentoMetaobjectOperationsMap<TSchema>;
-	}
-
-	async applySchema() {
-		await applySchema({
-			localSchema: this._.schema,
-			client: this._.client,
-		});
-	}
-}
+} from '../../graphql/gen/graphql';
+import type { Client } from '../gql-client';
+import { KnownKeysOnly, ListConfigQueryItem } from '../types';
+import { ShopifyJobOperation } from '../common/query';
 
 const metaFields: Record<string, Field<any>> = {
 	_id: singleLineTextField(),
 	_handle: singleLineTextField(),
+	_displayName: singleLineTextField(),
 	_updatedAt: dateTime(),
 };
 
@@ -126,20 +100,23 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 			.map((f) => (f in allSelectedFieldsMap ? `${f}: ${f.replace(/^_/, '')}` : undefined))
 			.filter((f) => f !== undefined)
 			.join(', ')}
-		${selectedFields.map((_, i) => `field${i}: field(key: $field${i}) { value }`).join(', ')}`;
+		${selectedFields.map((key, i) => `field${i}: field(key: "${key}") { value }`).join(', ')}`;
 	}
 
+	list(): Promise<ListResult<T>>;
+	list<TConfig extends ListConfig<T>>(
+		config?: KnownKeysOnly<TConfig, ListConfig<T>>,
+	): Promise<ListResult<T, TConfig['fields']>>;
+
 	async list<TConfig extends ListConfig<T>>(
-		config: KnownKeysOnly<TConfig, ListConfig<T>>,
+		config?: KnownKeysOnly<TConfig, ListConfig<T>>,
 	): Promise<ListResult<T, TConfig['fields']>> {
-		const allSelectedFieldsMap = this.getSelectedFields(config.fields);
+		const allSelectedFieldsMap = this.getSelectedFields(config?.fields);
 		const allSelectedFields = Object.keys(allSelectedFieldsMap);
 		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
 
 		const query = `
-			query ListMetaobjects($type: String!, $query: String, $after: String, $before: String, $first: Int, $last: Int, $reverse: Boolean, $sortKey: String, ${selectedFields
-				.map((_, i) => `$field${i}: String!`)
-				.join(', ')}) {
+			query ListMetaobjects($type: String!, $query: String, $after: String, $before: String, $first: Int, $last: Int, $reverse: Boolean, $sortKey: String) {
 				metaobjects(type: $type, query: $query, after: $after, before: $before, first: $first, last: $last, reverse: $reverse, sortKey: $sortKey) {
 					edges {
 						node {
@@ -153,15 +130,21 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 			}
 		`;
 
+		/**
+		 * TODO() Think about it
+		 * Set default value 50 to first if first or last not provided
+		 */
+		const first: TConfig['first'] | undefined =
+			typeof config?.first !== 'number' && typeof config?.last !== 'number' ? 50 : config.first;
 		const response = await this.client(query, {
 			type: this._.metaobject._.config.type,
-			query: buildListQuery(config.query),
-			after: config.after,
-			before: config.before,
-			first: config.first,
-			last: config.last,
-			reverse: config.reverse,
-			sortKey: config.sortKey,
+			query: buildListQuery(config?.query),
+			after: config?.after,
+			before: config?.before,
+			first,
+			last: config?.last,
+			reverse: config?.reverse,
+			sortKey: config?.sortKey,
 			...Object.fromEntries(selectedFields.map((f, i) => [`field${i}`, this._.metaobject.fieldKeysMap[f]])),
 		});
 
@@ -188,7 +171,7 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
 
 		const query = `
-			query GetMetaobject($id: ID!, ${selectedFields.map((_, i) => `$field${i}: String!`).join(', ')}) {
+			query GetMetaobject($id: ID!) {
 				metaobject(id: $id) {
 					${this.buildItemSelection(allSelectedFieldsMap, selectedFields)}
 				}
@@ -207,7 +190,9 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 			return undefined;
 		}
 
-		return this.mapItemResult(response.data.metaobject, allSelectedFieldsMap, selectedFields);
+		return this.mapItemResult(response.data?.metaobject, allSelectedFieldsMap, selectedFields) as unknown as
+			| ResultItem<T, TFields>
+			| undefined;
 	}
 
 	async *iterator<TConfig extends IteratorConfig<T>>(
@@ -262,19 +247,26 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 		}
 	}
 
-	async update(id: string, updates: UpdateConfig<T>) {
+	async update(id: string, updates: UpdateConfig<T>): Promise<ResultItem<T, undefined>> {
 		if (Object.keys(updates).length === 0) {
 			throw new Error('At least one update must be specified');
 		}
 
-		const query = graphql(`
+		const allSelectedFieldsMap = this.getSelectedFields(undefined);
+		const allSelectedFields = Object.keys(allSelectedFieldsMap);
+		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
+
+		const query = `
 			mutation UpdateMetaobject($id: ID!, $metaobject: MetaobjectUpdateInput!) {
 				metaobjectUpdate(id: $id, metaobject: $metaobject) {
+					metaobject {
+						${this.buildItemSelection(allSelectedFieldsMap, Object.keys(this._.metaobject.fieldKeysMap))}
+					}
 					userErrors {
 						field, message
 					}
 				}
-			}`);
+			}`;
 
 		const metaobjectUpdateInput: MetaobjectUpdateInput = {};
 
@@ -313,19 +305,33 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 		}
 
 		if (response.data?.metaobjectUpdate?.userErrors.length) {
-			throw new Error(response.data.metaobjectUpdate.userErrors.map((e) => e.message).join('\n'));
+			throw new Error(
+				response.data.metaobjectUpdate.userErrors
+					.map((e: Pick<MetaobjectUserError, 'message' | 'field'>) => e.message)
+					.join('\n'),
+			);
 		}
+
+		return this.mapItemResult(
+			response.data?.metaobjectUpdate.metaobject,
+			allSelectedFieldsMap,
+			selectedFields,
+		) as T['$inferSelect'];
 	}
 
 	async insert(item: T['$inferInsert']): Promise<ResultItem<T, undefined>> {
+		const allSelectedFieldsMap = this.getSelectedFields(undefined);
+		const allSelectedFields = Object.keys(allSelectedFieldsMap);
+		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
+
 		const query = `
-			mutation InsertMetaobject($metaobject: MetaobjectCreateInput!) {
+			mutation CreateMetaobject($metaobject: MetaobjectCreateInput!) {
 				metaobjectCreate(metaobject: $metaobject) {
 					userErrors {
 						field, message
 					}
 					metaobject {
-						${this.buildItemSelection({}, Object.keys(this._.metaobject.fieldKeysMap))}
+						${this.buildItemSelection(allSelectedFieldsMap, Object.keys(this._.metaobject.fieldKeysMap))}
 					}
 				}
 			}`;
@@ -359,22 +365,96 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 			);
 		}
 
+		return this.mapItemResult(
+			result.data.metaobjectCreate.metaobject,
+			allSelectedFieldsMap,
+			selectedFields,
+		) as T['$inferSelect'];
+	}
+
+	async upsert(handle: string, updates: UpdateConfig<T>): Promise<ResultItem<T, undefined>> {
+		if (Object.keys(updates).length === 0) {
+			throw new Error('At least one update must be specified');
+		}
+
 		const allSelectedFieldsMap = this.getSelectedFields(undefined);
 		const allSelectedFields = Object.keys(allSelectedFieldsMap);
 		const selectedFields = allSelectedFields.filter((f) => !metaFieldNames.includes(f));
 
-		return this.mapItemResult(result.data.metaobjectInsert.metaobject, allSelectedFieldsMap, selectedFields);
+		const query = `
+			mutation UpsertMetaobject($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
+              	metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
+              	  metaobject {
+					${this.buildItemSelection(allSelectedFieldsMap, Object.keys(this._.metaobject.fieldKeysMap))}
+              	  }
+              	  userErrors { field, message }
+              	}
+            }
+		`;
+
+		const metaobjectUpdateInput: MetaobjectUpdateInput = {};
+
+		if (updates.capabilities) {
+			metaobjectUpdateInput.capabilities = updates.capabilities as InputMaybe<MetaobjectCapabilityDataInput>;
+		}
+		if (updates.fields?.['_handle']) {
+			metaobjectUpdateInput.handle = updates.fields['_handle'];
+		}
+
+		for (const [k, v] of Object.entries(updates.fields ?? {})) {
+			if (k === '_handle') {
+				continue;
+			}
+			const resultKey = this._.metaobject.fieldKeysMap[k];
+			const field = this._.metaobject.fields[k];
+			if (!resultKey || !field) {
+				throw new Error(`Unknown field "${k}"`);
+			}
+			if (!metaobjectUpdateInput.fields) {
+				metaobjectUpdateInput.fields = [];
+			}
+			metaobjectUpdateInput.fields.push({
+				key: resultKey,
+				value: field.toAPIValue(v),
+			});
+		}
+
+		const response = await this.client(query, {
+			handle: {
+				type: this._.metaobject._.config.type,
+				handle,
+			},
+			metaobject: metaobjectUpdateInput,
+		});
+
+		if (response.errors) {
+			throw new Error(response.errors.graphQLErrors?.map((e) => e.message).join('\n'));
+		}
+
+		if (response.data?.metaobjectUpsert?.userErrors.length) {
+			throw new Error(
+				response.data.metaobjectUpsert.userErrors
+					.map((e: Pick<MetaobjectUserError, 'message' | 'field'>) => e.message)
+					.join('\n'),
+			);
+		}
+
+		return this.mapItemResult(
+			response.data?.metaobjectUpsert.metaobject,
+			allSelectedFieldsMap,
+			selectedFields,
+		) as T['$inferSelect'];
 	}
 
 	async delete(id: string) {
-		const query = graphql(`
+		const query = `
 			mutation DeleteMetaobject($id: ID!) {
 				metaobjectDelete(id: $id) {
 					userErrors {
 						field, message
 					}
 				}
-			}`);
+			}`;
 
 		const result = await this.client(query, { id });
 
@@ -383,23 +463,31 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 		}
 
 		if (result.data?.metaobjectDelete?.userErrors.length) {
-			throw new Error(result.data.metaobjectDelete.userErrors.map((e) => e.message).join('\n'));
+			throw new Error(
+				result.data.metaobjectDelete.userErrors
+					.map((e: Pick<MetaobjectUserError, 'message' | 'field'>) => e.message)
+					.join('\n'),
+			);
 		}
 	}
 
-	async bulkDelete(ids: string[]) {
-		const query = graphql(`
-			mutation BulkDeleteMetaobjects($ids: [ID!]!, $type: String!) {
+	async bulkDelete(ids?: string[]): Promise<ShopifyJobOperation> {
+		const query = `
+			mutation DeleteMetaobjects($ids: [ID!], $type: String) {
 				metaobjectBulkDelete(where: { ids: $ids, type: $type }) {
+					job {
+						id
+						done
+					}
 					userErrors {
 						field, message
 					}
 				}
-			}`);
+			}`;
 
 		const result = await this.client(query, {
 			ids,
-			type: this._.metaobject._.config.type,
+			type: ids?.length ? undefined : this._.metaobject._.config.type,
 		});
 
 		if (result.errors) {
@@ -407,29 +495,19 @@ export class ShopifyMetaobjectOperations<T extends Metaobject<any>> {
 		}
 
 		if (result.data?.metaobjectBulkDelete?.userErrors.length) {
-			throw new Error(result.data.metaobjectBulkDelete.userErrors.map((e) => e.message).join('\n'));
+			throw new Error(
+				result.data.metaobjectBulkDelete.userErrors
+					.map((e: Pick<MetaobjectUserError, 'message' | 'field'>) => e.message)
+					.join('\n'),
+			);
 		}
+
+		return new ShopifyJobOperation(
+			this.client,
+			String(result.data.metaobjectBulkDelete.job.id),
+			Boolean(result.data.metaobjectBulkDelete.job.done),
+		);
 	}
-}
-
-export type TentoMetaobjectOperationsMap<TSchema extends Record<string, Metaobject<any>>> = {
-	[K in keyof TSchema]: ShopifyMetaobjectOperations<TSchema[K]>;
-};
-
-export interface TentoConfig<TSchema extends Record<string, unknown>> {
-	client: ClientSource;
-	schema: TSchema;
-}
-
-export function tento<TSchema extends Record<string, unknown>>(
-	config: TentoConfig<TSchema>,
-): Tento<ExtractSchema<TSchema>> {
-	const { client: clientSource, schema: rawSchema } = config;
-	const client = createClientFromSource(clientSource);
-	const schema = Object.fromEntries(
-		Object.entries(rawSchema).filter((e): e is [(typeof e)[0], Metaobject<any>] => e[1] instanceof Metaobject),
-	) as ExtractSchema<TSchema>;
-	return new Tento(client, schema);
 }
 
 export function buildListQueryItem(query: ListConfigQueryItem<string | number | boolean | Date>): string {

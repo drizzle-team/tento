@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import chalk from 'chalk';
 import prompt from 'prompt';
-import { literal, object, optional, safeParse, string, tuple, union, type Output, boolean } from 'valibot';
+import { literal, object, optional, safeParse, string, tuple, union, type InferOutput, boolean } from 'valibot';
 import arg from 'arg';
 import semver from 'semver';
 import * as path from 'node:path';
@@ -24,7 +24,15 @@ import type {
 } from '../graphql/gen/graphql';
 import { readLocalSchema, type Config } from './index';
 import { createClient } from '../client/gql-client';
-import { Introspection, diffSchemas, introspectRemoteSchema } from '../client/diff';
+import {
+	MetafieldIntrospection,
+	MetaobjectIntrospection,
+	diffMetafieldSchemas,
+	diffSchemas,
+	setMetaobjectIdFor,
+	introspectMetafieldRemoteSchema,
+	introspectMetaobjectRemoteSchema,
+} from '../client/diff';
 
 const argsSchema = object({
 	'--config': optional(string(), 'tento.config.ts'),
@@ -33,7 +41,7 @@ const argsSchema = object({
 	_: tuple([union([literal('pull'), literal('push')])]),
 });
 
-type Args = Output<typeof argsSchema>;
+type Args = InferOutput<typeof argsSchema>;
 
 async function main() {
 	prompt.message = '';
@@ -48,8 +56,10 @@ async function main() {
 	if (!argsParseResult.success) {
 		console.log('Usage: tento <command> [options]\n');
 		console.log('Commands:');
-		console.log('  pull\t synchronize the metaobject definitions from Shopify to the local schema');
-		console.log('  push [--dry-run]\t synchronize the metaobject definitions from the local schema to Shopify');
+		console.log('  pull\t synchronize the metaobject and the metafield definitions from Shopify to the local schema');
+		console.log(
+			'  push [--dry-run]\t synchronize the metaobject and the metafield definitions from the local schema to Shopify',
+		);
 		console.log('\nOptions:');
 		console.log('  --config <path>\t path to the config file (default: tento.config.ts)');
 		console.log('  --debug');
@@ -95,15 +105,33 @@ async function readConfig(args: Args): Promise<Config> {
 
 async function push(args: Args) {
 	const config = await readConfig(args);
-
 	const client = createClient({ shop: config.shop, headers: config.headers });
-
 	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 
-	const [schema, introspection] = await Promise.all([readLocalSchema(schemaPath), introspectRemoteSchema(client)]);
-	const diff = diffSchemas(schema, introspection);
+	const [schemas, metaobjectIntrospection, metafieldIntrospection] = await Promise.all([
+		readLocalSchema(schemaPath),
+		introspectMetaobjectRemoteSchema(client),
+		introspectMetafieldRemoteSchema(client),
+	]);
 
-	if (!diff.create.length && !diff.update.length && !diff.delete.length) {
+	const { metaobjectSchema, metafieldSchema } = schemas;
+
+	const diffMetaobject = diffSchemas({
+		local: metaobjectSchema,
+		remote: metaobjectIntrospection,
+	});
+	const diffMetafield = diffMetafieldSchemas({
+		local: metafieldSchema,
+		remote: metafieldIntrospection,
+	});
+
+	if (
+		!diffMetaobject.create.length &&
+		!diffMetaobject.update.length &&
+		!diffMetaobject.delete.length &&
+		!diffMetafield.create.length && !diffMetafield.update.length &&
+		!diffMetafield.delete.length
+	) {
 		console.log(chalk.gray('😴 Schema is already up to date, no changes required'));
 		return;
 	}
@@ -111,25 +139,25 @@ async function push(args: Args) {
 	if (args['--dry-run']) {
 		console.log(chalk.yellow.bold('⚠️ This is a dry run, no changes will be applied'));
 		console.log(chalk.yellow('The following changes were detected:'));
-		console.log(utils.inspect(diff, { colors: true, depth: null }));
+		console.log(utils.inspect(diffMetaobject, { colors: true, depth: null }));
 		return;
 	}
 
 	let shouldConfirm = false;
 
-	if (diff.delete.length > 0) {
+	if (diffMetaobject.delete.length > 0) {
 		shouldConfirm = true;
 		console.log(chalk.red.bold('❗ The following metaobject definitions will be DELETED:'));
-		for (const id of diff.delete) {
-			const definition = introspection.find((d) => d.id === id)!;
+		for (const id of diffMetaobject.delete) {
+			const definition = metaobjectIntrospection.find((d) => d.id === id)!;
 			console.log(chalk.red(`  - ${definition.name ?? definition.type}`));
 		}
 	}
 
+	// Only for metaobjects due to possibility to have many fieldDefinitions
 	const fieldsToDelete: Record<string, string[]> = {};
-
-	if (diff.update.length > 0) {
-		for (const update of diff.update) {
+	if (diffMetaobject.update.length > 0) {
+		for (const update of diffMetaobject.update) {
 			for (const field of update.definition.fieldDefinitions ?? []) {
 				if (field.delete) {
 					fieldsToDelete[update.id] ??= [];
@@ -143,8 +171,21 @@ async function push(args: Args) {
 		shouldConfirm = true;
 		console.log(chalk.red.bold('❗ The following metaobject definition fields will be DELETED:'));
 		for (const [id, fields] of Object.entries(fieldsToDelete)) {
-			const definition = introspection.find((d) => d.id === id)!;
+			const definition = metaobjectIntrospection.find((d) => d.id === id)!;
 			console.log(chalk.red(`  - ${definition.name ?? definition.type}: ${fields.join(', ')}`));
+		}
+	}
+
+	/**
+	 * TODO() maybe need to recheck key + namespace if something match is could be just update
+	 * 	and no need to ask for deletion ???
+	 */
+	if (diffMetafield.delete.length > 0) {
+		shouldConfirm = true;
+		console.log(chalk.red.bold('❗ The following metafield definitions will be DELETED:'));
+		for (const id of diffMetafield.delete) {
+			const definition = metafieldIntrospection.find((d) => d.id === id)!;
+			console.log(chalk.red(`  - ${definition.namespace ?? 'custom'}.${definition.key}`));
 		}
 	}
 
@@ -167,6 +208,7 @@ async function push(args: Args) {
 		console.log();
 	}
 
+	// Metaobject
 	const createQuery = /* GraphQL */ `
 		mutation CreateMetaobjectDefinition($definition: MetaobjectDefinitionCreateInput!) {
 			metaobjectDefinitionCreate(definition: $definition) {
@@ -180,7 +222,7 @@ async function push(args: Args) {
 		}
 	`;
 
-	for (const create of diff.create) {
+	for (const create of diffMetaobject.create) {
 		const result = await client<CreateMetaobjectDefinitionMutation, CreateMetaobjectDefinitionMutationVariables>(
 			createQuery,
 			{ definition: create.definition },
@@ -213,7 +255,7 @@ async function push(args: Args) {
 		}
 	`;
 
-	for (const update of diff.update) {
+	for (const update of diffMetaobject.update) {
 		const result = await client(updateQuery, {
 			id: update.id,
 			definition: update.definition,
@@ -227,7 +269,7 @@ async function push(args: Args) {
 			process.exit(1);
 		}
 		let name = `"${result.data!.metaobjectDefinitionUpdate!.metaobjectDefinition!.name}"`;
-		const metaobject = introspection.find((d) => d.id === update.id)!;
+		const metaobject = metaobjectIntrospection.find((d) => d.id === update.id)!;
 		if (metaobject.name !== name) {
 			name = `"${metaobject.name}" -> ${name}`;
 		}
@@ -243,7 +285,7 @@ async function push(args: Args) {
 			}
 		}`;
 
-	for (const id of diff.delete) {
+	for (const id of diffMetaobject.delete) {
 		const result = await client<DeleteMetaobjectDefinitionMutation, DeleteMetaobjectDefinitionMutationVariables>(
 			deleteQuery,
 			{ id },
@@ -256,8 +298,123 @@ async function push(args: Args) {
 			console.error(result.data.metaobjectDefinitionDelete.userErrors);
 			process.exit(1);
 		}
-		const metaobject = introspection.find((d) => d.id === id)!;
+		const metaobject = metaobjectIntrospection.find((d) => d.id === id)!;
 		console.log(chalk.gray(`- Deleted metaobject definition "${metaobject.name}"`));
+	}
+
+	// Metafield
+	const createMetafieldQuery = /* GraphQL */ `
+		mutation CreateMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+			metafieldDefinitionCreate(definition: $definition) {
+				createdDefinition {
+					namespace
+					key
+				}
+				userErrors {
+					field, message
+				}
+			}
+		}
+	`;
+
+	for (const create of diffMetafield.create) {
+		const referenceValidations = create.definition.validations?.filter((v) => v.name === 'metaobject_definition_id');
+		if (typeof referenceValidations !== 'undefined') {
+			await setMetaobjectIdFor({ client, validations: referenceValidations });
+		}
+
+		const result = await client(createMetafieldQuery, { definition: create.definition });
+		if (result.errors?.graphQLErrors?.length) {
+			console.error(result.errors.graphQLErrors);
+			process.exit(1);
+		}
+		if (result.data?.metafieldDefinitionCreate?.userErrors?.length) {
+			console.error(result.data.metafieldDefinitionCreate.userErrors);
+			process.exit(1);
+		}
+		const metafieldName = `${result.data!.metafieldDefinitionCreate!.createdDefinition!.namespace}.${
+			result.data!.metafieldDefinitionCreate!.createdDefinition!.key
+		}`;
+		console.log(chalk.gray(`- Created metafield definition "${metafieldName}"`));
+	}
+
+	const updateMetafieldQuery = /* GraphQL */ `
+		mutation UpdateMetafieldDefinition($definition: MetafieldDefinitionUpdateInput!) {
+			metafieldDefinitionUpdate(definition: $definition) {
+				updatedDefinition {
+					id
+					namespace
+					key
+				}
+				userErrors {
+					field, message
+				}
+			}
+		}
+	`;
+
+	for (const update of diffMetafield.update) {
+		const { definition } = update;
+
+		const referenceValidations = definition.validations?.filter((v) => v.name === 'metaobject_definition_id');
+		if (typeof referenceValidations !== 'undefined') {
+			await setMetaobjectIdFor({ client, validations: referenceValidations });
+		}
+
+		const result = await client(updateMetafieldQuery, {
+			definition: {
+				description: definition.description ?? undefined,
+				key: definition.key,
+				ownerType: definition.ownerType,
+				name: definition.name ?? undefined,
+				namespace: definition.namespace ?? undefined,
+				pin: typeof definition.pin !== 'undefined' ? definition.pin : undefined,
+				useAsCollectionCondition:
+					typeof definition.useAsCollectionCondition !== 'undefined' ? definition.useAsCollectionCondition : undefined,
+				validations: definition.validations ?? undefined,
+			},
+		});
+		if (result.errors?.graphQLErrors?.length) {
+			console.error(result.errors.graphQLErrors);
+			process.exit(1);
+		}
+		if (result.data?.metafieldDefinitionUpdate?.userErrors?.length) {
+			console.error(result.data.metafieldDefinitionUpdate.userErrors);
+			process.exit(1);
+		}
+		let name = `"${result.data!.metafieldDefinitionUpdate!.updatedDefinition!.namespace}.${
+			result.data!.metafieldDefinitionUpdate!.updatedDefinition!.key
+		}"`;
+
+		const metafield = metafieldIntrospection.find((d) => d.id === update.id)!;
+		const metafieldName = `"${metafield.namespace}.${metafield.key}"`;
+		if (metafieldName !== name) {
+			name = `${metafield.name} -> ${name}`;
+		}
+		console.log(chalk.gray(`- Updated metafield definition ${name}`));
+	}
+
+	const deleteMetafieldQuery = /* GraphQL */ `
+		mutation DeleteMetafieldDefinition($id: ID!) {
+			metafieldDefinitionDelete(id: $id) {
+				userErrors {
+					field, message
+				}
+			}
+		}`;
+
+	for (const id of diffMetafield.delete) {
+		const result = await client(deleteMetafieldQuery, { id });
+		if (result.errors?.graphQLErrors?.length) {
+			console.error(result.errors.graphQLErrors);
+			process.exit(1);
+		}
+		if (result.data?.metafieldDefinitionDelete?.userErrors?.length) {
+			console.error(result.data.metafieldDefinitionDelete.userErrors);
+			process.exit(1);
+		}
+		const metafield = metafieldIntrospection.find((d) => d.id === id)!;
+		console.log(chalk.gray(`- Deleted metafield definition "${metafield.namespace}.${metafield.key}"`));
 	}
 
 	console.log(chalk.green('✅ All changes applied'));
@@ -265,7 +422,6 @@ async function push(args: Args) {
 
 async function pull(args: Args) {
 	const config = await readConfig(args);
-
 	const schemaPath = path.resolve(path.dirname(args['--config']), config.schemaPath);
 	const schemaStat = await fs.stat(schemaPath).catch(() => undefined);
 	if (schemaStat) {
@@ -289,18 +445,21 @@ async function pull(args: Args) {
 		}
 	}
 
-	const gql = createClient({ shop: config.shop, headers: config.headers });
+	const client = createClient({ shop: config.shop, headers: config.headers });
 
-	const introspection = await introspectRemoteSchema(gql);
-
-	if (!introspection.length) {
-		console.log(chalk.yellow.bold('No metaobject definitions detected'));
+	const metaobjectIntrospection = await introspectMetaobjectRemoteSchema(client);
+	const metafieldsIntrospection = await introspectMetafieldRemoteSchema(client);
+	if (!metaobjectIntrospection.length && !metafieldsIntrospection.length) {
+		console.log(chalk.yellow.bold('No metaobject | metafield definitions detected'));
 		console.log(chalk.gray('Hint: you can use "sp push" to push the local schema to Shopify'));
 		process.exit(1);
 	}
 
-	const codegen: (string | undefined)[] = ["import { metaobject } from '@drizzle-team/tento';\n"];
-	for (const definition of introspection) {
+	// metaobject + metafield codegen ready
+	const codegen: (string | undefined)[] = [
+		`import { metaobject${metafieldsIntrospection.length ? ', metafield' : ''} } from '@drizzle-team/tento';\n`,
+	];
+	for (const definition of metaobjectIntrospection) {
 		codegen.push(
 			`export const ${definition.type} = metaobject({`,
 			`\tname: '${definition.name}',`,
@@ -310,13 +469,33 @@ async function pull(args: Args) {
 				: undefined,
 			'\tfieldDefinitions: (f) => ({',
 			...(definition.fieldDefinitions?.flatMap((field) => {
-				const definition = mapFieldDefinition(field);
+				const definition = mapMetaobjectFieldDefinition(field);
 
 				return [`\t\t${field.key}: f.${mapFieldName(field.type)}(${definition}),`];
 			}) ?? []),
 			'\t}),',
 			'});\n',
 		);
+	}
+
+	if (metafieldsIntrospection.length) {
+		for (const definition of metafieldsIntrospection) {
+			codegen.push(
+				`export const ${definition.key} = metafield({`,
+				`\tname: '${definition.name}',`,
+				`\tkey: '${definition.key}',`,
+				`\tnamespace: '${definition.namespace}',`,
+				`\townerType: '${definition.ownerType}',`,
+				typeof definition.description === 'string'
+					? `\tdescription: '${definition.description.replace("'", "\\'")}',`
+					: undefined,
+				!definition.pin ? undefined : `\tpin: ${definition.pin},`,
+				`\tfieldDefinition: (f) => f.${mapFieldName(
+					definition.fieldDefinition.type,
+				)}(${mapMetafieldValidationsDefinition(definition.fieldDefinition)})`,
+				'});\n',
+			);
+		}
 	}
 
 	console.log(chalk.gray(`Writing schema to "${schemaPath}"`));
@@ -351,7 +530,7 @@ function mapFieldName(field: string) {
 	return result;
 }
 
-function mapFieldDefinition(field: Introspection[number]['fieldDefinitions'][number]) {
+function mapMetaobjectFieldDefinition(field: MetaobjectIntrospection[number]['fieldDefinitions'][number]) {
 	const result: Record<string, string> = {};
 	if (field.name !== field.key) {
 		result['name'] = `'${field.name!.replace("'", "\\'")}'`;
@@ -377,9 +556,24 @@ function mapFieldDefinition(field: Introspection[number]['fieldDefinitions'][num
 	return ['{', ...Object.entries(result).map(([key, value]) => `\t\t\t${key}: ${value},`), '\t\t}'].join('\n');
 }
 
+function mapMetafieldValidationsDefinition(field: MetafieldIntrospection[number]['fieldDefinition']) {
+	const result: Record<string, string> = {};
+	if (field.validations.length) {
+		const validations = mapValidations(field.type, field.validations);
+		if (validations) {
+			result['validations'] = validations;
+		}
+	}
+
+	if (!Object.keys(result).length) {
+		return '';
+	}
+	return ['{', ...Object.entries(result).map(([key, value]) => `\t\t\t${key}: ${value},`), '\t\t}'].join('\n');
+}
+
 function mapValidations(
 	fieldType: string,
-	validations: Introspection[number]['fieldDefinitions'][number]['validations'],
+	validations: MetaobjectIntrospection[number]['fieldDefinitions'][number]['validations'],
 ) {
 	if (!validations.length) {
 		return undefined;
@@ -437,6 +631,10 @@ function mapValidations(
 			}
 			case 'choices': {
 				result.push(`v.choices(${jsonStringify(JSON.parse(validation.value!))})`);
+				break;
+			}
+			case 'metaobject_reference': {
+				result.push(`v.metaobjectDefinitionType(() => ${validation.value}.type)`);
 				break;
 			}
 			default: {

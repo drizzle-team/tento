@@ -118,15 +118,15 @@ const sp = tento({
 
 // await sp.orms.delete('gid://shopify/Metaobject/35528147247');
 
-const items = await sp.orm.list({
+const items = await sp.metaobjects.orm.list({
 	first: 10,
 });
 
 console.log(items);
 
-export type ORM = typeof sp.orm.$inferSelect;
+export type ORM = typeof sp.metaobjects.orm.$inferSelect;
 //           ^?
-export type InsertORM = typeof sp.orm.$inferInsert;
+export type InsertORM = typeof sp.metaobjects.orm.$inferInsert;
 //           ^?
-export type UpdateORM = typeof sp.orm.$inferUpdate;
+export type UpdateORM = typeof sp.metaobjects.orm.$inferUpdate;
 //           ^?
