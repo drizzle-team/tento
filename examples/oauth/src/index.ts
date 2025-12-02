@@ -21,7 +21,7 @@ const shopify = shopifyApi({
 	scopes: env.SHOPIFY_SCOPES as string[],
 	hostName: 'localhost:3000',
 	hostScheme: 'http',
-	apiVersion: ApiVersion.October23,
+	apiVersion: ApiVersion.October25,
 	isEmbeddedApp: true,
 });
 

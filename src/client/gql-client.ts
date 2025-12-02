@@ -63,7 +63,7 @@ export function createClient({
 	fetch?: Fetch;
 }): Client {
 	const client: RawClient = async (query, vars) => {
-		const response = await fetch(`https://${shop}.myshopify.com/admin/api/2023-10/graphql.json`, {
+		const response = await fetch(`https://${shop}.myshopify.com/admin/api/2025-10/graphql.json`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
